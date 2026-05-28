@@ -14,6 +14,7 @@ class MasterSiswa extends Model
         'nama',
         'kelas_id',
         'saldo',
+        'isActive'
     ];
 
     // Relasi ke Kelas

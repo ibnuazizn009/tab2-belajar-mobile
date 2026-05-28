@@ -1,26 +1,43 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useFocusEffect } from 'expo-router';
 import * as SecureStore from 'expo-secure-store'
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 // Menggunakan standar baru Expo Router untuk area aman layar
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // Import pemicu logout global dari file layout tetangga
 import { triggerLogoutGlobal } from './_layout';
 import {tab2ApiService} from '../../services/Tab2apiservice'
+import { SkeletonHome, SkeletonBox } from '../../components/SkeletonLoader';
 
 export default function HomeScreen() {
   // Mengambil data padding notch/status bar secara dinamis & akurat
   const insets = useSafeAreaInsets();
 
+  const [isLoading, setIsLoading] = useState(false);
   const [namaPetugas, setNamaPetugas] = useState('')
   const [kelasId, setKelasId] = useState('')
   const [namaKelas, setNamaKelas] = useState('')
   const [dataSiswa, setDataSiswa] = useState<any[]>([]);
+  const [totalSetoranKelas, setTotalSetoranKelas] = useState<number>(0);
+  const [totalTransaksi, setTotalTransaksi] = useState<number>(0);
 
-  const loadKelas = async () => {
+  const hariIni = new Date().toISOString().split('T')[0]; 
+
+  const tglAwalFormat = `${hariIni} 00:00:00`; 
+  const tglAkhirFormat = `${hariIni} 23:59:59`;
+
+  const formatRupiah = (angka: number) => {
+    // Mengubah angka menjadi string berformat ribuan (contoh: 15450000 menjadi 15.450.000)
+    const nominalString = angka.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    
+    return `Rp ${nominalString}`;
+  };
+
+  const loadKelas = async (idYangDipilih: string) => {
     try {
       const responseData = await tab2ApiService.getNonMessage(
-        `${process.env.EXPO_PUBLIC_API_URL}/siswa/kelas?kelasId=${kelasId}`,
+        `${process.env.EXPO_PUBLIC_API_URL}/siswa/kelas?kelasId=${idYangDipilih}`,
         'kelas'
       )
       setNamaKelas(responseData.nama_kelas);
@@ -30,10 +47,10 @@ export default function HomeScreen() {
     }
   }
 
-  const loadDataSiswa = async () => {
+  const loadDataSiswa = async (idYangDipilih: string) => {
     try {
       const responseData = await tab2ApiService.getNonMessage(
-        `${process.env.EXPO_PUBLIC_API_URL}/siswa/siswa?kelasId=${kelasId}`,
+        `${process.env.EXPO_PUBLIC_API_URL}/siswa/siswa-per-kelas?kelasId=${idYangDipilih}`,
         'siswa'
       )
       setDataSiswa(responseData.data || []);
@@ -44,59 +61,95 @@ export default function HomeScreen() {
     }
   }
 
-  const loadDataTransaksi = async () => {
+  const loadTransaksiSiswa = async (idYangDipilih: string) => {
     try {
       const responseData = await tab2ApiService.getNonMessage(
-        `${process.env.EXPO_PUBLIC_API_URL}/siswa/transaksi?kelasId=${kelasId}`,
+        `${process.env.EXPO_PUBLIC_API_URL}/siswa/transaksi-per-kelas?kelasId=${idYangDipilih}`,
         'siswa'
-      )
-      setDataSiswa(responseData.data || []);
-
-    } catch (error: any) {
-      const message = error?.data?.message || 'Tidak ada data siswa'
-      console.error('Load siswa error:', error)
+      );
+  
+      if (responseData && responseData.data) {
+        const dataSiswa = responseData.data;
+        // setListSiswa(dataSiswa);
+  
+        const totalUangSetor = dataSiswa.reduce((sum: number, siswa: any) => {
+          return sum + Number(siswa.total_nominal_setor || 0);
+        }, 0);
+  
+        setTotalSetoranKelas(totalUangSetor);
+      }
+    } catch (error) {
+      console.error('Load transaksi siswa error:', error);
     }
-  }
+  };
+
+  const loadTransaksiTanggal = async (idYangDipilih: string) => {
+    try {
+      const responseData = await tab2ApiService.getNonMessage(
+        `${process.env.EXPO_PUBLIC_API_URL}/siswa/transaksi-tanggal?kelasId=${idYangDipilih}&tgl_awal=${tglAwalFormat}&tgl_akhir=${tglAkhirFormat}`,
+        'siswa'
+      );
+  
+      if (responseData && responseData.data) {
+        const totalTransaksi = responseData.total_transaksi ?? 0;
+        // setListSiswa(dataSiswa);
+  
+        setTotalTransaksi(totalTransaksi);
+      }
+    } catch (error) {
+      console.error('Load transaksi siswa error:', error);
+    }
+  };
   
 
-  useEffect(() => {
-    loadDataSiswa()
-    loadKelas()
-    const loadUserInfo = async () => {
-      const raw = await SecureStore.getItemAsync('user_info')
-      if (raw) {
-        const user = JSON.parse(raw)
-        setNamaPetugas(user.nama_petugas)
-        setKelasId(user.kelas_id)
+  useFocusEffect(
+    useCallback(() => {
+      const initializeData = async () => {
+        setIsLoading(true);
+        try {
+          const raw = await SecureStore.getItemAsync('user_info')
+          
+          if (raw) {
+            const user = JSON.parse(raw)
+            setNamaPetugas(user.nama_petugas)
+            setKelasId(user.kelas_id)
+            
+            await loadKelas(user.kelas_id)
+            await loadDataSiswa(user.kelas_id)
+            await loadTransaksiSiswa(user.kelas_id)
+            await loadTransaksiTanggal(user.kelas_id)
+          }
+        } catch (error) {
+          console.error('Gagal inisialisasi data:', error)
+        }finally {
+          setIsLoading(false); // selesai loading (berhasil maupun gagal)
+        }
+  
       }
-    }
-    loadUserInfo()
-  }, [])
+    
+      initializeData()
+    }, []) // [] = tidak ada dependency, jadi hanya re-run saat tab difokus
+  );
 
   
   const dataRingkasan = {
     namaPetugas: namaPetugas || '-',
     namaKelas: namaKelas || '-',
-    totalTabungan: "Rp 15.450.000",
+    totalTabungan: formatRupiah(totalSetoranKelas) || 0,
     totalSiswa: dataSiswa.length || '-',
-    transaksiHariIni: "12 Transaksi"
+    transaksiHariIni: totalTransaksi || '-',
   };
 
   return (
     <View style={[styles.mainContainer, { backgroundColor: '#f8fafc' }]}>
-      {/* ScrollView utama dengan padding atas dinamis + extra space agar lebih ke bawah */}
       <ScrollView 
         style={styles.container} 
         contentContainerStyle={[
           styles.contentContainer, 
-          { 
-            // insets.top mengambil tinggi status bar, kita tambah 25 agar posisi turun ideal
-            paddingTop: (insets.top || 20) + 40 
-          }
+          { paddingTop: (insets.top || 20) + 40 }
         ]}
       >
-        
-        {/* Bagian Atas / Selamat Datang + Tombol Pemicu Logout */}
+        {/* Header - SELALU TAMPIL, tidak skeleton */}
         <View style={styles.headerSection}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <View>
@@ -104,46 +157,69 @@ export default function HomeScreen() {
               <Text style={styles.adminName}>{dataRingkasan.namaPetugas}</Text>
               <Text style={styles.kelasName}>Walikelas : {dataRingkasan.namaKelas}</Text>
             </View>
-            
-            {/* Tombol Merah Keluar Sistem */}
-            <TouchableOpacity 
-              style={styles.logoutButton} 
-              onPress={() => triggerLogoutGlobal()}
-            >
+            <TouchableOpacity style={styles.logoutButton} onPress={() => triggerLogoutGlobal()}>
               <FontAwesome name="power-off" size={16} color="#dc2626" />
               <Text style={styles.logoutText}>Keluar</Text>
             </TouchableOpacity>
           </View>
           <Text style={styles.subText}>Sistem Penginputan Tabungan Siswa</Text>
         </View>
-
-        {/* Kartu Hero Informasi Saldo Total */}
-        <View style={styles.balanceCard}>
-          <View style={styles.cardInfo}>
-            <Text style={styles.cardTitle}>Total Tabungan Semua Siswa</Text>
-            <Text style={styles.cardBalance}>{dataRingkasan.totalTabungan}</Text>
-          </View>
-          <FontAwesome name="money" size={40} color="#fff" style={styles.cardIcon} />
-        </View>
-
-        {/* Baris Kotak Kecil Data Statistik */}
-        <View style={styles.statsRow}>
-          <View style={styles.statsBox}>
-            <FontAwesome name="users" size={20} color="#0284c7" />
-            <Text style={styles.statsValue}>{dataRingkasan.totalSiswa}</Text>
-            <Text style={styles.statsLabel}>Aktif Menabung</Text>
-          </View>
-          
-          <View style={styles.statsBox}>
-            <FontAwesome name="exchange" size={20} color="#16a34a" />
-            <Text style={styles.statsValue}>{dataRingkasan.transaksiHariIni}</Text>
-            <Text style={styles.statsLabel}>Hari Ini</Text>
-          </View>
-        </View>
-
-        {/* Grid Navigasi Menu Pintas Beranda */}
+  
+        {isLoading ? (
+          <>
+            {/* Skeleton hanya untuk bagian yang fetch data */}
+  
+            {/* Skeleton Balance Card */}
+            <View style={{ backgroundColor: '#0284c7', borderRadius: 16, padding: 20,
+                           flexDirection: 'row', justifyContent: 'space-between',
+                           alignItems: 'center', marginBottom: 20 }}>
+              <View>
+                <SkeletonBox width={140} height={12} style={{ marginBottom: 10, opacity: 0.4 }} />
+                <SkeletonBox width={180} height={28} style={{ opacity: 0.4 }} />
+              </View>
+              <SkeletonBox width={44} height={44} style={{ borderRadius: 22, opacity: 0.3 }} />
+            </View>
+  
+            {/* Skeleton Stats Row */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 25 }}>
+              {[0, 1].map(i => (
+                <View key={i} style={[styles.statsBox, { alignItems: 'center' }]}>
+                  <SkeletonBox width={32} height={32} style={{ borderRadius: 16, marginBottom: 8 }} />
+                  <SkeletonBox width={50} height={18} style={{ marginBottom: 6 }} />
+                  <SkeletonBox width={80} height={11} />
+                </View>
+              ))}
+            </View>
+          </>
+        ) : (
+          <>
+            {/* Balance Card - data asli */}
+            <View style={styles.balanceCard}>
+              <View style={styles.cardInfo}>
+                <Text style={styles.cardTitle}>Total Tabungan Semua Siswa</Text>
+                <Text style={styles.cardBalance}>{dataRingkasan.totalTabungan}</Text>
+              </View>
+              <FontAwesome name="money" size={40} color="#fff" style={styles.cardIcon} />
+            </View>
+  
+            {/* Stats Row - data asli */}
+            <View style={styles.statsRow}>
+              <View style={styles.statsBox}>
+                <FontAwesome name="users" size={20} color="#0284c7" />
+                <Text style={styles.statsValue}>{dataRingkasan.totalSiswa}</Text>
+                <Text style={styles.statsLabel}>Aktif Menabung</Text>
+              </View>
+              <View style={styles.statsBox}>
+                <FontAwesome name="exchange" size={20} color="#16a34a" />
+                <Text style={styles.statsValue}>{dataRingkasan.transaksiHariIni}</Text>
+                <Text style={styles.statsLabel}>Transaksi Hari Ini</Text>
+              </View>
+            </View>
+          </>
+        )}
+  
+        {/* Menu Pintas - SELALU TAMPIL, tidak ada data dari API */}
         <Text style={styles.sectionTitle}>Menu Pintas</Text>
-        
         <View style={styles.menuGrid}>
           <TouchableOpacity style={styles.menuButton} activeOpacity={0.7}>
             <View style={[styles.iconWrapper, { backgroundColor: '#e0f2fe' }]}>
@@ -151,21 +227,18 @@ export default function HomeScreen() {
             </View>
             <Text style={styles.menuLabel}>Input Setoran</Text>
           </TouchableOpacity>
-
           <TouchableOpacity style={styles.menuButton} activeOpacity={0.7}>
             <View style={[styles.iconWrapper, { backgroundColor: '#fee2e2' }]}>
               <FontAwesome name="minus-circle" size={24} color="#dc2626" />
             </View>
             <Text style={styles.menuLabel}>Tarik Tabungan</Text>
           </TouchableOpacity>
-
           <TouchableOpacity style={styles.menuButton} activeOpacity={0.7}>
             <View style={[styles.iconWrapper, { backgroundColor: '#fef3c7' }]}>
               <FontAwesome name="search" size={24} color="#d97706" />
             </View>
             <Text style={styles.menuLabel}>Cari Siswa</Text>
           </TouchableOpacity>
-
           <TouchableOpacity style={styles.menuButton} activeOpacity={0.7}>
             <View style={[styles.iconWrapper, { backgroundColor: '#e2e8f0' }]}>
               <FontAwesome name="file-text" size={24} color="#475569" />
@@ -173,7 +246,7 @@ export default function HomeScreen() {
             <Text style={styles.menuLabel}>Laporan</Text>
           </TouchableOpacity>
         </View>
-
+  
       </ScrollView>
     </View>
   );
@@ -318,4 +391,31 @@ const styles = StyleSheet.create({
     fontWeight: '600', 
     color: '#334155' 
   },
+  loadingOverlay: {
+    position: 'absolute',  // menimpa semua konten di bawahnya
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)', // putih transparan
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 999,
+  },
+  loadingBox: {
+    backgroundColor: '#ffffff',
+    paddingVertical: 24,
+    paddingHorizontal: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#64748b',
+  }  
 });

@@ -1,28 +1,90 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import * as SecureStore from 'expo-secure-store'
+import Toast from 'react-native-toast-message';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
+import {tab2ApiService} from '../../services/Tab2apiservice'
 
 export default function TransaksiScreen() {
   const [nis, setNis] = useState('');
   const [nama, setNama] = useState('');
-  const [tipe, setTipe] = useState<'setor' | 'tarik'>('setor');
+  const [tipe, setTipe] = useState<'setor' | 'tarik' | ''>('');
   const [nominal, setNominal] = useState('');
+  const [kelasId, setKelasId] = useState('');
+  const [listSiswa, setListSiswa] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const postTransaksiData = async() => {
+    if (!nis.trim()) return;
+    if (!tipe) return;
+    if (!nominal || Number(nominal) <= 0) return;
+  
+    try {
+      setLoading(true);
+
+      const payload = {
+        nis: nis,
+        tipe: tipe,
+        nominal: Number(nominal), // Konversi string input ke angka
+      };
+      
+      const response = await tab2ApiService.post(
+        `${process.env.EXPO_PUBLIC_API_URL}/siswa/transaksi`,
+        payload,
+        'transaksi' 
+      );
+
+      if (response && response.success) {
+        setNis('');
+        setNama('');
+        setTipe('');
+        setNominal('');
+      }
+    } catch (error) {
+      console.error('Submit transaksi error:', error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const loadDataSiswa = async (idYangDipilih: string) => {
+    try {
+      const responseData = await tab2ApiService.getNonMessage(
+        `${process.env.EXPO_PUBLIC_API_URL}/siswa/siswa-per-kelas?kelasId=${idYangDipilih}`,
+        'siswa'
+      )
+
+      if (responseData && responseData.data) {
+        setListSiswa(responseData.data || []);
+      }
+
+    } catch (error: any) {
+      const message = error?.data?.message || 'Tidak ada data siswa'
+      console.error('Load siswa error:', error)
+    }
+  }
+
+  useEffect(() => {
+    const initializeData = async () => {
+      try {
+        const raw = await SecureStore.getItemAsync('user_info')
+        
+        if (raw) {
+          const user = JSON.parse(raw)
+          setKelasId(user.kelas_id) // Tetap set state untuk kebutuhan UI lain jika ada
+          
+          await loadDataSiswa(user.kelas_id)
+        }
+      } catch (error) {
+        console.error('Gagal inisialisasi data:', error)
+      }
+    }
+  
+    initializeData()
+  }, [])
 
   const handleSimpan = () => {
-    if (!nis || !nominal) {
-      Alert.alert("Data Belum Lengkap", "Silakan isi NIS dan Nominal transaksi terlebih dahulu.");
-      return;
-    }
-
-    Alert.alert(
-      "Transaksi Berhasil",
-      `Berhasil menyimpan transaksi ${tipe === 'setor' ? 'SETORAN' : 'PENARIKAN'} sebesar Rp ${parseInt(nominal).toLocaleString('id-ID')} untuk siswa bernama ${nama || 'Siswa (Mochammad)'}`
-    );
-    
-    // Reset Form setelah sukses
-    setNis('');
-    setNama('');
-    setNominal('');
+    postTransaksiData()
   };
 
   return (
@@ -42,9 +104,34 @@ export default function TransaksiScreen() {
               value={nis}
               onChangeText={(val) => {
                 setNis(val);
-                // Simulasi auto-fill nama ketika NIS diisi
-                if (val === '123') setNama('Mochammad Ibnu');
+
+                const siswaDitemukan = listSiswa.find((siswa) => siswa.nis === val);
+
+                if (siswaDitemukan) {
+                  setNama(siswaDitemukan.nama);
+                } else {
+                  setNama('');
+
+                  if (val.length === 7) { 
+                    Toast.show({
+                      type: 'error',
+                      text1: 'Siswa Tidak Ditemukan',
+                      text2: 'Siswa bukan dari kelas ini, NIS salah, atau siswa sudah lulus.',
+                      position: 'top',
+                      visibilityTime: 4000,
+                      props: {
+                        style: {
+                          alignSelf: 'flex-end', // Menggeser komponen ke kanan
+                          marginRight: 20,
+                          marginTop: 30,
+                          width: '70%', 
+                        }
+                      }
+                    });
+                  }
+                }
               }}
+              editable={!loading}
             />
           </View>
         </View>
@@ -56,9 +143,10 @@ export default function TransaksiScreen() {
             <FontAwesome name="user" size={16} color="#64748b" style={styles.icon} />
             <TextInput
               style={styles.input}
-              placeholder="Nama akan muncul otomatis atau ketik manual"
+              placeholder="Nama akan muncul otomatis"
               value={nama}
               onChangeText={setNama}
+              editable={false}
             />
           </View>
         </View>
@@ -94,6 +182,7 @@ export default function TransaksiScreen() {
               keyboardType="number-pad"
               value={nominal}
               onChangeText={setNominal}
+              editable={!loading}
             />
           </View>
         </View>

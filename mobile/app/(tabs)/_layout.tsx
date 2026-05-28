@@ -194,11 +194,11 @@ export default function TabLayout() {
 
       {/* Tab 3: Data Siswa */}
       <Tabs.Screen
-        name="siswa"
+        name="riwayat"
         options={{
-          title: 'Siswa',
-          tabBarIcon: ({ color }) => <FontAwesome name="users" size={22} color={color} />,
-          headerTitle: 'Buku Induk Siswa',
+          title: 'Riwayat',
+          tabBarIcon: ({ color }) => <FontAwesome name="history" size={22} color={color} />,
+          headerTitle: 'Riwayat Transaksi Siswa',
         }}
       />
     </Tabs>

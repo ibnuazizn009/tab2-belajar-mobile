@@ -4,6 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\Siswa\SiswaController;
+use App\Http\Controllers\Siswa\TransaksiController;
 
 
 /*
@@ -27,7 +28,10 @@ Route::middleware('auth.jwt')->group(function () use ($prefix) {
     Route::get("$prefix/auth/me",       [AuthController::class, 'me']);
 
     Route::get("$prefix/siswa/kelas", [SiswaController::class, 'getDataKelas']);
-    Route::get("$prefix/siswa/siswa", [SiswaController::class, 'getDataSiswa']);
+    Route::get("$prefix/siswa/siswa-per-kelas", [SiswaController::class, 'getDataSiswaPerKelas']);
+    Route::get("$prefix/siswa/transaksi-per-kelas", [SiswaController::class, 'getDataTransaksiSiswaPerKelas']);
+    Route::get("$prefix/siswa/transaksi-tanggal", [SiswaController::class, 'getDataTransaksiTanggal']);
+    Route::post("$prefix/siswa/transaksi",  [TransaksiController::class, 'postTransaksiSiswa']);
     // Route::get("$prefix/siswa",                   [SiswaController::class, 'getDataSiswa']);
     // Route::get("$prefix/siswa-bykelas",            [SiswaController::class, 'getDataSiswaByKelas']);
     // Route::get("$prefix/siswa/{nis}",              [SiswaController::class, 'getDataSiswaByNis']);

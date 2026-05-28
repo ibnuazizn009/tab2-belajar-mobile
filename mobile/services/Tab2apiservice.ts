@@ -5,10 +5,7 @@
 
 import * as SecureStore from 'expo-secure-store'
 import { jwtDecode } from 'jwt-decode'
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+import Toast from 'react-native-toast-message'
 
 interface DecodedToken {
   exp: number
@@ -17,24 +14,29 @@ interface DecodedToken {
 
 type SnackbarType = 'success' | 'error' | 'info' | 'warning'
 
-// ---------------------------------------------------------------------------
-// Snackbar helpers
-// Ganti dengan toast library pilihan Anda (react-native-toast-message, dll.)
-// ---------------------------------------------------------------------------
-
 const showSnackbar = (message: string, type: SnackbarType) => {
-  // TODO: ganti dengan toast library yang dipakai di proyek Anda
-  // Contoh: Toast.show({ type, text1: message })
-  console.log(`[${type.toUpperCase()}] ${message}`)
+  Toast.show({
+    type: type === 'success' ? 'success' : 'error', 
+    text1: type === 'success' ? 'Sukses' : 'Gagal',
+    text2: message,
+    position: 'top',
+    visibilityTime: 3500,
+    // Menambahkan style kustom agar bergeser ke kanan atas
+    props: {
+      style: {
+        alignSelf: 'flex-end', // Menggeser komponen ke kanan
+        marginRight: 20,
+        marginTop: 10,
+        width: '70%', 
+      }
+    }
+  })
 }
 
 const showSnackbarNonMessage = (_type: SnackbarType) => {
   // Intentionally silent
 }
 
-// ---------------------------------------------------------------------------
-// Storage helper
-// ---------------------------------------------------------------------------
 
 const getAccessToken = async (): Promise<string | null> => {
   try {
@@ -45,19 +47,11 @@ const getAccessToken = async (): Promise<string | null> => {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Token expired handler (global)
-// ---------------------------------------------------------------------------
-
 let handleTokenExpired: (() => void) | null = null
 
 export const setTokenExpiredHandler = (handler: () => void) => {
   handleTokenExpired = handler
 }
-
-// ---------------------------------------------------------------------------
-// Token validator
-// ---------------------------------------------------------------------------
 
 const validateToken = async (): Promise<string | null> => {
   const accessToken = await getAccessToken()
@@ -82,10 +76,6 @@ const validateToken = async (): Promise<string | null> => {
 
   return accessToken
 }
-
-// ---------------------------------------------------------------------------
-// Error detail extractor
-// ---------------------------------------------------------------------------
 
 const extractErrorDetails = (responseData: any, fallback: string): string => {
   const errorMessage = responseData?.message || fallback
