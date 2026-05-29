@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import * as SecureStore from 'expo-secure-store'
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
@@ -72,11 +72,7 @@ export default function HomeScreen() {
         const dataSiswa = responseData.data;
         // setListSiswa(dataSiswa);
   
-        const totalUangSetor = dataSiswa.reduce((sum: number, siswa: any) => {
-          return sum + Number(siswa.total_nominal_setor || 0);
-        }, 0);
-  
-        setTotalSetoranKelas(totalUangSetor);
+        setTotalSetoranKelas(dataSiswa.totalTabungan);
       }
     } catch (error) {
       console.error('Load transaksi siswa error:', error);
@@ -221,25 +217,29 @@ export default function HomeScreen() {
         {/* Menu Pintas - SELALU TAMPIL, tidak ada data dari API */}
         <Text style={styles.sectionTitle}>Menu Pintas</Text>
         <View style={styles.menuGrid}>
-          <TouchableOpacity style={styles.menuButton} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.menuButton} activeOpacity={0.7}
+              onPress={() => router.navigate({ pathname: '/(tabs)/transaksi', params: { defaultTipe: 'setor', hideOther: 'true'  } })}
+            >
             <View style={[styles.iconWrapper, { backgroundColor: '#e0f2fe' }]}>
               <FontAwesome name="plus-circle" size={24} color="#0284c7" />
             </View>
             <Text style={styles.menuLabel}>Input Setoran</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.menuButton} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.menuButton} activeOpacity={0.7} 
+            onPress={() => router.navigate({ pathname: '/(tabs)/transaksi', params: { defaultTipe: 'tarik', hideOther: 'true' } })}
+            >
             <View style={[styles.iconWrapper, { backgroundColor: '#fee2e2' }]}>
               <FontAwesome name="minus-circle" size={24} color="#dc2626" />
             </View>
             <Text style={styles.menuLabel}>Tarik Tabungan</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.menuButton} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.menuButton} activeOpacity={0.7} onPress={() => router.navigate('/siswa')}>
             <View style={[styles.iconWrapper, { backgroundColor: '#fef3c7' }]}>
               <FontAwesome name="search" size={24} color="#d97706" />
             </View>
             <Text style={styles.menuLabel}>Cari Siswa</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.menuButton} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.menuButton} activeOpacity={0.7} onPress={() => router.navigate('/laporan')}>
             <View style={[styles.iconWrapper, { backgroundColor: '#e2e8f0' }]}>
               <FontAwesome name="file-text" size={24} color="#475569" />
             </View>

@@ -37,26 +37,38 @@ class SiswaController extends Controller
     public function getDataTransaksiSiswaPerKelas(Request $request)
     {
         $kelasId = $request->input('kelasId') ?? $request->input('kelas_id');
+        $tglAwal  = $request->input('tgl_awal');  
+        $tglAkhir = $request->input('tgl_akhir');
 
-        $siswa = MasterSiswa::from('master_siswa as ms')
-            ->join('kelas as kl', 'kl.id', '=', 'ms.kelas_id')
-            ->leftJoin('tabel_transaksi as tt', 'tt.nis', '=', 'ms.nis')
+        $totalTabunganBersih = MasterSiswa::from('master_siswa as ms')
+            ->join('tabel_transaksi as tt', 'tt.nis', '=', 'ms.nis')
             ->where('ms.kelas_id', $kelasId)
             ->where('ms.isActive', 1)
-            ->groupBy('ms.nis', 'ms.nama', 'ms.saldo', 'kl.nama_kelas')
-            ->select(
-                'ms.nis',
-                'ms.nama',
-                'ms.saldo', // Saldo berjalan saat ini di master_siswa
-                'kl.nama_kelas',
-                // Menghitung total nominal khusus yang tipenya 'setor'
-                DB::raw("SUM(CASE WHEN tt.tipe = 'setor' THEN tt.nominal ELSE 0 END) as total_nominal_setor")
-            )
-            ->get();
+            ->when($tglAwal && $tglAkhir, function($query) use ($tglAwal, $tglAkhir) {
+                return $query->whereBetween('tt.created_at', [$tglAwal, $tglAkhir]);
+            })
+            ->select(DB::raw("
+                SUM(CASE WHEN tt.tipe = 'setor' THEN tt.nominal ELSE 0 END) - 
+                SUM(CASE WHEN tt.tipe = 'tarik' THEN tt.nominal ELSE 0 END) as total_bersih
+            "))
+            ->first()
+            ->total_bersih ?? 0; 
+        
+        $totalSiswa = MasterSiswa::where('kelas_id', $kelasId)->where('isActive', 1)->count();
+
+        $transaksiHariIni = MasterSiswa::from('master_siswa as ms')
+            ->join('tabel_transaksi as tt', 'tt.nis', '=', 'ms.nis')
+            ->where('ms.kelas_id', $kelasId)
+            ->whereDate('tt.created_at', \Carbon\Carbon::today())
+            ->count();
 
         return response()->json([
             'success' => true,
-            'data' => $siswa
+            'data' => [
+                'totalTabungan' => (int)$totalTabunganBersih,
+                'totalSiswa' => $totalSiswa,
+                'transaksiHariIni' => $transaksiHariIni
+            ]
         ]);
     }
 

@@ -31,7 +31,8 @@ Route::middleware('auth.jwt')->group(function () use ($prefix) {
     Route::get("$prefix/siswa/siswa-per-kelas", [SiswaController::class, 'getDataSiswaPerKelas']);
     Route::get("$prefix/siswa/transaksi-per-kelas", [SiswaController::class, 'getDataTransaksiSiswaPerKelas']);
     Route::get("$prefix/siswa/transaksi-tanggal", [SiswaController::class, 'getDataTransaksiTanggal']);
-    Route::post("$prefix/siswa/transaksi",  [TransaksiController::class, 'postTransaksiSiswa']);
+    Route::post("$prefix/transaksi/transaksi",  [TransaksiController::class, 'postTransaksiSiswa']);
+    Route::get("$prefix/transaksi/riwayat-transaksi",  [TransaksiController::class, 'getRiwayatTransaksiSiswa']);
     // Route::get("$prefix/siswa",                   [SiswaController::class, 'getDataSiswa']);
     // Route::get("$prefix/siswa-bykelas",            [SiswaController::class, 'getDataSiswaByKelas']);
     // Route::get("$prefix/siswa/{nis}",              [SiswaController::class, 'getDataSiswaByNis']);

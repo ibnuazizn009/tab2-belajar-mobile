@@ -1,11 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import * as SecureStore from 'expo-secure-store'
+import { useLocalSearchParams } from 'expo-router';
 import Toast from 'react-native-toast-message';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import {tab2ApiService} from '../../services/Tab2apiservice'
 
 export default function TransaksiScreen() {
+  const { defaultTipe, hideOther } = useLocalSearchParams<{ 
+    defaultTipe: 'setor' | 'tarik', 
+    hideOther: string 
+  }>();
+  
+
   const [nis, setNis] = useState('');
   const [nama, setNama] = useState('');
   const [tipe, setTipe] = useState<'setor' | 'tarik' | ''>('');
@@ -13,6 +20,11 @@ export default function TransaksiScreen() {
   const [kelasId, setKelasId] = useState('');
   const [listSiswa, setListSiswa] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const formatInputNominal = (value: string) => {
+    const nomorMurni = value.replace(/\D/g, '');
+    return nomorMurni.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  };
 
   const postTransaksiData = async() => {
     if (!nis.trim()) return;
@@ -27,9 +39,9 @@ export default function TransaksiScreen() {
         tipe: tipe,
         nominal: Number(nominal), // Konversi string input ke angka
       };
-      
+
       const response = await tab2ApiService.post(
-        `${process.env.EXPO_PUBLIC_API_URL}/siswa/transaksi`,
+        `${process.env.EXPO_PUBLIC_API_URL}/transaksi/transaksi`,
         payload,
         'transaksi' 
       );
@@ -83,6 +95,12 @@ export default function TransaksiScreen() {
     initializeData()
   }, [])
 
+  useEffect(() => {
+    if (defaultTipe) {
+      setTipe(defaultTipe);
+    }
+  }, [defaultTipe]);
+
   const handleSimpan = () => {
     postTransaksiData()
   };
@@ -123,7 +141,6 @@ export default function TransaksiScreen() {
                         style: {
                           alignSelf: 'flex-end', // Menggeser komponen ke kanan
                           marginRight: 20,
-                          marginTop: 30,
                           width: '70%', 
                         }
                       }
@@ -154,21 +171,25 @@ export default function TransaksiScreen() {
         {/* Pilihan Tipe Transaksi */}
         <Text style={styles.label}>Jenis Transaksi</Text>
         <View style={styles.typeRow}>
-          <TouchableOpacity 
-            style={[styles.typeButton, tipe === 'setor' && styles.activeSetor]} 
-            onPress={() => setTipe('setor')}
-          >
-            <FontAwesome name="plus-circle" size={18} color={tipe === 'setor' ? '#fff' : '#16a34a'} />
-            <Text style={[styles.typeText, tipe === 'setor' && styles.activeTypeText]}>Setor Tunai</Text>
-          </TouchableOpacity>
+          {!(hideOther === 'true' && tipe === 'tarik') && (
+            <TouchableOpacity 
+              style={[styles.typeButton, tipe === 'setor' && styles.activeSetor]} 
+              onPress={() => setTipe('setor')}
+            >
+              <FontAwesome name="plus-circle" size={18} color={tipe === 'setor' ? '#fff' : '#16a34a'} />
+              <Text style={[styles.typeText, tipe === 'setor' && styles.activeTypeText]}>Setor Tunai</Text>
+            </TouchableOpacity>
+          )}
 
-          <TouchableOpacity 
-            style={[styles.typeButton, tipe === 'tarik' && styles.activeTarik]} 
-            onPress={() => setTipe('tarik')}
-          >
-            <FontAwesome name="minus-circle" size={18} color={tipe === 'tarik' ? '#fff' : '#dc2626'} />
-            <Text style={[styles.typeText, tipe === 'tarik' && styles.activeTypeText]}>Tarik Tunai</Text>
-          </TouchableOpacity>
+          {!(hideOther === 'true' && tipe === 'setor') && (
+              <TouchableOpacity 
+                style={[styles.typeButton, tipe === 'tarik' && styles.activeTarik]} 
+                onPress={() => setTipe('tarik')}
+              >
+                <FontAwesome name="minus-circle" size={18} color={tipe === 'tarik' ? '#fff' : '#dc2626'} />
+                <Text style={[styles.typeText, tipe === 'tarik' && styles.activeTypeText]}>Tarik Tunai</Text>
+              </TouchableOpacity>
+            )}
         </View>
 
         {/* Input Nominal */}
@@ -178,10 +199,15 @@ export default function TransaksiScreen() {
             <Text style={styles.rpText}>Rp</Text>
             <TextInput
               style={styles.input}
-              placeholder="Contoh: 50000"
+              placeholder="Contoh: 50.000"
               keyboardType="number-pad"
-              value={nominal}
-              onChangeText={setNominal}
+              // TAMPILAN: Otomatis diubah ke format bertitik saat dirender
+              value={formatInputNominal(nominal)} 
+              onChangeText={(val) => {
+                // Hapus titik sebelum disimpan ke state agar nilainya tetap angka murni (Contoh: "50000")
+                const angkaMurni = val.replace(/\D/g, '');
+                setNominal(angkaMurni);
+              }}
               editable={!loading}
             />
           </View>

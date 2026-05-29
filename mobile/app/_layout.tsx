@@ -5,7 +5,7 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
-import Toast from 'react-native-toast-message';
+import Toast, { BaseToast, ErrorToast, ToastConfig } from 'react-native-toast-message';
 
 import { useColorScheme } from '@/components/useColorScheme';
 
@@ -21,6 +21,29 @@ export const unstable_settings = {
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
+
+const toastConfig: ToastConfig = {
+  success: (props) => (
+    <BaseToast
+      {...props}
+      style={[{ borderLeftColor: '#16a34a', height: 'auto', minHeight: 70, paddingVertical: 10 }, props.props?.style]}
+      contentContainerStyle={{ paddingHorizontal: 15 }}
+      text1Style={{ fontSize: 16, fontWeight: 'bold', color: '#1e293b' }}
+      text2Style={{ fontSize: 13, color: '#475569' }}
+      text2NumberOfLines={2}
+    />
+  ),
+  error: (props) => (
+    <ErrorToast
+      {...props}
+      style={[{ borderLeftColor: '#dc2626', height: 'auto', minHeight: 70, paddingVertical: 10 }, props.props?.style]}
+      contentContainerStyle={{ paddingHorizontal: 15 }}
+      text1Style={{ fontSize: 16, fontWeight: 'bold', color: '#1e293b' }}
+      text2Style={{ fontSize: 13, color: '#475569' }}
+      text2NumberOfLines={3}
+    />
+  ),
+};
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
@@ -55,7 +78,7 @@ function RootLayoutNav() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
       </Stack>
-      <Toast />
+      <Toast config={toastConfig} topOffset={100} />
     </ThemeProvider>
   );
 }
