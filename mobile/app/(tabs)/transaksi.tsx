@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as SecureStore from 'expo-secure-store'
 import { useLocalSearchParams } from 'expo-router';
 import Toast from 'react-native-toast-message';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView } from 'react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import {tab2ApiService} from '../../services/Tab2apiservice'
 
@@ -12,10 +13,10 @@ export default function TransaksiScreen() {
     hideOther: string 
   }>();
   
-
+  const queryClient = useQueryClient();
   const [nis, setNis] = useState('');
   const [nama, setNama] = useState('');
-  const [tipe, setTipe] = useState<'setor' | 'tarik' | ''>('');
+  const [tipe, setTipe] = useState<'setor' | 'tarik' | ''>(defaultTipe || '');
   const [nominal, setNominal] = useState('');
   const [kelasId, setKelasId] = useState('');
   const [listSiswa, setListSiswa] = useState<any[]>([]);
@@ -47,6 +48,8 @@ export default function TransaksiScreen() {
       );
 
       if (response && response.success) {
+        queryClient.invalidateQueries({ queryKey: ['totalTabunganSiswa'] });
+        queryClient.invalidateQueries({ queryKey: ['transaksiHariIni'] });
         setNis('');
         setNama('');
         setTipe('');
@@ -96,9 +99,7 @@ export default function TransaksiScreen() {
   }, [])
 
   useEffect(() => {
-    if (defaultTipe) {
-      setTipe(defaultTipe);
-    }
+    setTipe(defaultTipe || '');
   }, [defaultTipe]);
 
   const handleSimpan = () => {

@@ -1,4 +1,4 @@
-import { Tabs } from 'expo-router';
+import { Tabs, router } from 'expo-router';
 import React, { useState, useRef, useEffect } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, PanResponder } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
@@ -185,16 +185,35 @@ export default function TabLayout() {
       {/* Tab 2: Transaksi */}
       <Tabs.Screen
         name="transaksi"
+        listeners={{
+          tabPress: (e) => {
+            e.preventDefault();
+            router.replace({
+              pathname: '/transaksi',
+              params: { defaultTipe: '', hideOther: '' }
+            });
+          },
+        }}
         options={{
           title: 'Transaksi',
           tabBarIcon: ({ color }) => <FontAwesome name="exchange" size={22} color={color} />,
           headerTitle: 'Input Transaksi',
+          
         }}
       />
 
       {/* Tab 3: Data Siswa */}
       <Tabs.Screen
         name="riwayat"
+        listeners={{
+          tabPress: (e) => {
+            e.preventDefault();
+            router.replace({
+              pathname: '/riwayat',
+              params: { defaultTipe: '', hideOther: '' }
+            });
+          },
+        }}
         options={{
           title: 'Riwayat',
           tabBarIcon: ({ color }) => <FontAwesome name="history" size={22} color={color} />,

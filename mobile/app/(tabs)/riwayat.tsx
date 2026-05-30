@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { useFocusEffect } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
 import * as SecureStore from 'expo-secure-store'
 import { StyleSheet, Text, View, TextInput, FlatList, TouchableOpacity, Platform } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
@@ -57,55 +58,91 @@ export default function RiwayatScreen() {
     return isEnd ? `${d} 23:59:59` : `${d} 00:00:00`;
   };
 
-  const filteredData = dataRiwayat.filter(item =>
+  const { data: userInfo } = useQuery({
+    queryKey: ['userInfo'],
+    queryFn: async () => {
+      const raw = await SecureStore.getItemAsync('user_info');
+      return raw ? JSON.parse(raw) : null;
+    },
+    staleTime: Infinity,
+  });
+
+  const kelasIdQuery = userInfo?.kelas_id;
+
+  const { data: riwayatTransaksiQuery = [], isLoading: isTanggalLoading, refetch: refetchRiwayat } = useQuery({
+    queryKey: ['riwayatTransaksi', kelasIdQuery, tglAwal, tglAkhir],
+    queryFn: async () => {
+      const responseData = await tab2ApiService.getNonMessage(
+        `${process.env.EXPO_PUBLIC_API_URL}/transaksi/riwayat-transaksi?kelasId=${kelasIdQuery}&tgl_awal=${formatTanggalApi(tglAwal, false)}&tgl_akhir=${formatTanggalApi(tglAkhir, true)}`,
+        'riwayat'
+      );
+      return responseData.data || [];
+    },
+    enabled: !!kelasIdQuery && !!tglAwal && !!tglAkhir,
+    staleTime: 0,
+  });
+
+
+  const filteredData = (riwayatTransaksiQuery || []).filter((item: any) =>
     item.nama.toLowerCase().includes(search.toLowerCase()) || item.nis.includes(search)
   );
 
-  const loadRiwayatTransaksi = async (idYangDipilih: string, awal: Date, akhir: Date) => {
-    try {
-      const responseData = await tab2ApiService.getNonMessage(
-        `${process.env.EXPO_PUBLIC_API_URL}/transaksi/riwayat-transaksi?kelasId=${idYangDipilih}&tgl_awal=${formatTanggalApi(awal, false)}&tgl_akhir=${formatTanggalApi(akhir, true)}`,
-        'riwayat'
-      );
-      setDataRiwayat(responseData.data || []);
-    } catch (error: any) {
-      console.error('Load riwayat error:', error);
-    }
-  };
+
+  // const loadRiwayatTransaksi = async (idYangDipilih: string, awal: Date, akhir: Date) => {
+  //   try {
+  //     const responseData = await tab2ApiService.getNonMessage(
+  //       `${process.env.EXPO_PUBLIC_API_URL}/transaksi/riwayat-transaksi?kelasId=${idYangDipilih}&tgl_awal=${formatTanggalApi(awal, false)}&tgl_akhir=${formatTanggalApi(akhir, true)}`,
+  //       'riwayat'
+  //     );
+  //     setDataRiwayat(responseData.data || []);
+  //   } catch (error: any) {
+  //     console.error('Load riwayat error:', error);
+  //   }
+  // };
+
+  // useFocusEffect(
+  //   useCallback(() => {
+  //     const initializeData = async () => {
+  //       setIsLoading(true);
+  //       try {
+  //         const raw = await SecureStore.getItemAsync('user_info');
+  //         if (raw) {
+  //           const user = JSON.parse(raw);
+  //           setKelasId(user.kelas_id);
+  //           await loadRiwayatTransaksi(user.kelas_id, tglAwal, tglAkhir);
+  //         }
+  //       } catch (error) {
+  //         console.error('Gagal inisialisasi data:', error);
+  //       } finally {
+  //         setIsLoading(false);
+  //       }
+  //     };
+  //     initializeData();
+  //   }, [])
+  // );
 
   useFocusEffect(
     useCallback(() => {
-      const initializeData = async () => {
-        setIsLoading(true);
-        try {
-          const raw = await SecureStore.getItemAsync('user_info');
-          if (raw) {
-            const user = JSON.parse(raw);
-            setKelasId(user.kelas_id);
-            await loadRiwayatTransaksi(user.kelas_id, tglAwal, tglAkhir);
-          }
-        } catch (error) {
-          console.error('Gagal inisialisasi data:', error);
-        } finally {
-          setIsLoading(false);
-        }
-      };
-      initializeData();
+      const hariIniAwal = new Date();
+      hariIniAwal.setHours(0, 0, 0, 0);
+
+      const hariIniAkhir = new Date();
+      hariIniAkhir.setHours(23, 59, 59, 999);
+
+      setTglAwal(hariIniAwal);
+      setTglAkhir(hariIniAkhir);
     }, [])
   );
 
   // Dipanggil saat user ganti tanggal dan tekan "Cari"
-  const handleCariTanggal = async () => {
+  const handleCariTanggal = () => {
     if (tglAwal > tglAkhir) {
       alert('Tanggal awal tidak boleh lebih dari tanggal akhir');
       return;
     }
-    setIsLoading(true);
-    try {
-      await loadRiwayatTransaksi(kelasId, tglAwal, tglAkhir);
-    } finally {
-      setIsLoading(false);
-    }
+    
+    // Panggil refetchRiwayat untuk memaksa React Query menarik data berdasarkan tanggal baru
+    refetchRiwayat();
   };
 
   return (
@@ -144,10 +181,10 @@ export default function RiwayatScreen() {
           </TouchableOpacity>
 
           {/* Tombol Cari */}
-          <TouchableOpacity style={styles.cariButton} onPress={handleCariTanggal}>
+          {/* <TouchableOpacity style={styles.cariButton} onPress={handleCariTanggal}>
             <FontAwesome name="search" size={14} color="#fff" />
             <Text style={styles.cariText}>Cari</Text>
-          </TouchableOpacity>
+          </TouchableOpacity> */}
 
         </View>
       </View>
@@ -179,7 +216,7 @@ export default function RiwayatScreen() {
       )}
 
       {/* List */}
-      {isLoading ? (
+      {isTanggalLoading ? (
         <SkeletonRiwayat />
       ) : (
         <FlatList
@@ -260,8 +297,8 @@ const styles = StyleSheet.create({
   // Filter tanggal
   filterSection: { backgroundColor: '#fff', paddingHorizontal: 20, paddingVertical: 12, borderBottomWidth: 1, borderColor: '#e2e8f0' },
   filterLabel: { fontSize: 12, color: '#94a3b8', marginBottom: 8, fontWeight: '500' },
-  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  dateButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f0f9ff', borderWidth: 1, borderColor: '#bae6fd', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 },
+  dateRow: {  flexDirection: 'row', alignItems: 'center', gap: 8 },
+  dateButton: { flex:1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#f0f9ff', borderWidth: 1, borderColor: '#bae6fd', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 },
   dateText: { fontSize: 13, color: '#0284c7', fontWeight: '500' },
   dateSeparator: { fontSize: 16, color: '#94a3b8' },
   cariButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0284c7', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 7, gap: 6 },

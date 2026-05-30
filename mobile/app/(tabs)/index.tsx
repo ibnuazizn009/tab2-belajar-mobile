@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { router, useFocusEffect } from 'expo-router';
 import * as SecureStore from 'expo-secure-store'
+import { useQuery } from '@tanstack/react-query';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 // Menggunakan standar baru Expo Router untuk area aman layar
@@ -14,127 +15,189 @@ export default function HomeScreen() {
   // Mengambil data padding notch/status bar secara dinamis & akurat
   const insets = useSafeAreaInsets();
 
-  const [isLoading, setIsLoading] = useState(false);
-  const [namaPetugas, setNamaPetugas] = useState('')
-  const [kelasId, setKelasId] = useState('')
-  const [namaKelas, setNamaKelas] = useState('')
-  const [dataSiswa, setDataSiswa] = useState<any[]>([]);
-  const [totalSetoranKelas, setTotalSetoranKelas] = useState<number>(0);
-  const [totalTransaksi, setTotalTransaksi] = useState<number>(0);
-
   const hariIni = new Date().toISOString().split('T')[0]; 
 
   const tglAwalFormat = `${hariIni} 00:00:00`; 
   const tglAkhirFormat = `${hariIni} 23:59:59`;
 
   const formatRupiah = (angka: number) => {
-    // Mengubah angka menjadi string berformat ribuan (contoh: 15450000 menjadi 15.450.000)
     const nominalString = angka.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
     
     return `Rp ${nominalString}`;
   };
+  
+  // ==================== QUERY 1: Ambil data User dari SecureStore ====================
+  const { data: userInfo } = useQuery({
+    queryKey: ['userInfo'],
+    queryFn: async () => {
+      const raw = await SecureStore.getItemAsync('user_info');
+      return raw ? JSON.parse(raw) : null;
+    },
+    staleTime: Infinity,
+  });
 
-  const loadKelas = async (idYangDipilih: string) => {
-    try {
+  const kelasIdQuery = userInfo?.kelas_id;
+  const namaPetugasQuery = userInfo?.nama_petugas || '-';
+
+  // ==================== QUERY 2: Load Nama Kelas ====================
+  const { data: namaKelasQuery, isLoading: isKelasLoading } = useQuery({
+    queryKey: ['namaKelas', kelasIdQuery],
+    queryFn: async () => {
       const responseData = await tab2ApiService.getNonMessage(
-        `${process.env.EXPO_PUBLIC_API_URL}/siswa/kelas?kelasId=${idYangDipilih}`,
+        `${process.env.EXPO_PUBLIC_API_URL}/siswa/kelas?kelasId=${kelasIdQuery}`,
         'kelas'
-      )
-      setNamaKelas(responseData.nama_kelas);
-    } catch (error: any) {
-      const message = error?.data?.message || 'Tidak ada data kelas'
-      console.error('Load kelas error:', error)
-    }
-  }
+      );
+      return responseData?.nama_kelas || '-';
+    },
+    enabled: !!kelasIdQuery,
+    staleTime: Infinity,
+  });
 
-  const loadDataSiswa = async (idYangDipilih: string) => {
-    try {
+  // ==================== QUERY 3: Load Data Siswa (Menghitung Total Siswa) ====================
+  const { data: dataSiswaQuery = [], isLoading: isSiswaLoading } = useQuery({
+    queryKey: ['dataSiswa', kelasIdQuery],
+    queryFn: async () => {
       const responseData = await tab2ApiService.getNonMessage(
-        `${process.env.EXPO_PUBLIC_API_URL}/siswa/siswa-per-kelas?kelasId=${idYangDipilih}`,
-        'siswa'
-      )
-      setDataSiswa(responseData.data || []);
-
-    } catch (error: any) {
-      const message = error?.data?.message || 'Tidak ada data siswa'
-      console.error('Load siswa error:', error)
-    }
-  }
-
-  const loadTransaksiSiswa = async (idYangDipilih: string) => {
-    try {
-      const responseData = await tab2ApiService.getNonMessage(
-        `${process.env.EXPO_PUBLIC_API_URL}/siswa/transaksi-per-kelas?kelasId=${idYangDipilih}`,
+        `${process.env.EXPO_PUBLIC_API_URL}/siswa/siswa-per-kelas?kelasId=${kelasIdQuery}`,
         'siswa'
       );
-  
-      if (responseData && responseData.data) {
-        const dataSiswa = responseData.data;
-        // setListSiswa(dataSiswa);
-  
-        setTotalSetoranKelas(dataSiswa.totalTabungan);
-      }
-    } catch (error) {
-      console.error('Load transaksi siswa error:', error);
-    }
-  };
+      return responseData?.data || [];
+    },
+    enabled: !!kelasIdQuery,
+    staleTime: 0,
+  });
 
-  const loadTransaksiTanggal = async (idYangDipilih: string) => {
-    try {
+  // ==================== QUERY 4: Load Total Transaksi Siswa (Saldo) ====================
+  const { data: totalSetoranKelasQuery = 0, isLoading: isTransaksiLoading } = useQuery({
+    queryKey: ['totalTabunganSiswa', kelasIdQuery],
+    queryFn: async () => {
       const responseData = await tab2ApiService.getNonMessage(
-        `${process.env.EXPO_PUBLIC_API_URL}/siswa/transaksi-tanggal?kelasId=${idYangDipilih}&tgl_awal=${tglAwalFormat}&tgl_akhir=${tglAkhirFormat}`,
+        `${process.env.EXPO_PUBLIC_API_URL}/siswa/transaksi-per-kelas?kelasId=${kelasIdQuery}`,
         'siswa'
       );
+      return responseData?.data?.totalTabungan ?? 0;
+    },
+    enabled: !!kelasIdQuery,
+    staleTime: 0, 
+  });
+
+  // ==================== QUERY 5: Load Transaksi Tanggal (Hari ini) ====================
+  const { data: totalTransaksiQuery = 0, isLoading: isTanggalLoading } = useQuery({
+    queryKey: ['transaksiHariIni', kelasIdQuery],
+    queryFn: async () => {
+      const responseData = await tab2ApiService.getNonMessage(
+        `${process.env.EXPO_PUBLIC_API_URL}/siswa/transaksi-tanggal?kelasId=${kelasIdQuery}&tgl_awal=${tglAwalFormat}&tgl_akhir=${tglAkhirFormat}`,
+        'siswa'
+      );
+      return responseData?.total_transaksi ?? 0;
+    },
+    enabled: !!kelasIdQuery,
+    staleTime: 0,
+  });
+
+  // const loadKelas = async (idYangDipilih: string) => {
+  //   try {
+  //     const responseData = await tab2ApiService.getNonMessage(
+  //       `${process.env.EXPO_PUBLIC_API_URL}/siswa/kelas?kelasId=${idYangDipilih}`,
+  //       'kelas'
+  //     )
+  //     setNamaKelas(responseData.nama_kelas);
+  //   } catch (error: any) {
+  //     const message = error?.data?.message || 'Tidak ada data kelas'
+  //     console.error('Load kelas error:', error)
+  //   }
+  // }
+
+  // const loadDataSiswa = async (idYangDipilih: string) => {
+  //   try {
+  //     const responseData = await tab2ApiService.getNonMessage(
+  //       `${process.env.EXPO_PUBLIC_API_URL}/siswa/siswa-per-kelas?kelasId=${idYangDipilih}`,
+  //       'siswa'
+  //     )
+  //     setDataSiswa(responseData.data || []);
+
+  //   } catch (error: any) {
+  //     const message = error?.data?.message || 'Tidak ada data siswa'
+  //     console.error('Load siswa error:', error)
+  //   }
+  // }
+
+  // const loadTransaksiSiswa = async (idYangDipilih: string) => {
+  //   try {
+  //     const responseData = await tab2ApiService.getNonMessage(
+  //       `${process.env.EXPO_PUBLIC_API_URL}/siswa/transaksi-per-kelas?kelasId=${idYangDipilih}`,
+  //       'siswa'
+  //     );
   
-      if (responseData && responseData.data) {
-        const totalTransaksi = responseData.total_transaksi ?? 0;
-        // setListSiswa(dataSiswa);
+  //     if (responseData && responseData.data) {
+  //       const dataSiswa = responseData.data;
+  //       // setListSiswa(dataSiswa);
   
-        setTotalTransaksi(totalTransaksi);
-      }
-    } catch (error) {
-      console.error('Load transaksi siswa error:', error);
-    }
-  };
+  //       setTotalSetoranKelas(dataSiswa.totalTabungan);
+  //     }
+  //   } catch (error) {
+  //     console.error('Load transaksi siswa error:', error);
+  //   }
+  // };
+
+  // const loadTransaksiTanggal = async (idYangDipilih: string) => {
+  //   try {
+  //     const responseData = await tab2ApiService.getNonMessage(
+  //       `${process.env.EXPO_PUBLIC_API_URL}/siswa/transaksi-tanggal?kelasId=${idYangDipilih}&tgl_awal=${tglAwalFormat}&tgl_akhir=${tglAkhirFormat}`,
+  //       'siswa'
+  //     );
+  
+  //     if (responseData && responseData.data) {
+  //       const totalTransaksi = responseData.total_transaksi ?? 0;
+  //       // setListSiswa(dataSiswa);
+  
+  //       setTotalTransaksi(totalTransaksi);
+  //     }
+  //   } catch (error) {
+  //     console.error('Load transaksi siswa error:', error);
+  //   }
+  // };
   
 
-  useFocusEffect(
-    useCallback(() => {
-      const initializeData = async () => {
-        setIsLoading(true);
-        try {
-          const raw = await SecureStore.getItemAsync('user_info')
+  // useFocusEffect(
+  //   useCallback(() => {
+  //     const initializeData = async () => {
+  //       setIsLoading(true);
+  //       try {
+  //         const raw = await SecureStore.getItemAsync('user_info')
           
-          if (raw) {
-            const user = JSON.parse(raw)
-            setNamaPetugas(user.nama_petugas)
-            setKelasId(user.kelas_id)
+  //         if (raw) {
+  //           const user = JSON.parse(raw)
+  //           setNamaPetugas(user.nama_petugas)
+  //           setKelasId(user.kelas_id)
             
-            await loadKelas(user.kelas_id)
-            await loadDataSiswa(user.kelas_id)
-            await loadTransaksiSiswa(user.kelas_id)
-            await loadTransaksiTanggal(user.kelas_id)
-          }
-        } catch (error) {
-          console.error('Gagal inisialisasi data:', error)
-        }finally {
-          setIsLoading(false); // selesai loading (berhasil maupun gagal)
-        }
+  //           await loadKelas(user.kelas_id)
+  //           await loadDataSiswa(user.kelas_id)
+  //           await loadTransaksiSiswa(user.kelas_id)
+  //           await loadTransaksiTanggal(user.kelas_id)
+  //         }
+  //       } catch (error) {
+  //         console.error('Gagal inisialisasi data:', error)
+  //       }finally {
+  //         setIsLoading(false); // selesai loading (berhasil maupun gagal)
+  //       }
   
-      }
+  //     }
     
-      initializeData()
-    }, []) // [] = tidak ada dependency, jadi hanya re-run saat tab difokus
-  );
+  //     initializeData()
+  //   }, []) // [] = tidak ada dependency, jadi hanya re-run saat tab difokus
+  // );
 
   
-  const dataRingkasan = {
-    namaPetugas: namaPetugas || '-',
-    namaKelas: namaKelas || '-',
-    totalTabungan: formatRupiah(totalSetoranKelas) || 0,
-    totalSiswa: dataSiswa.length || '-',
-    transaksiHariIni: totalTransaksi || '-',
-  };
+  // const dataRingkasan = {
+  //   namaPetugas: namaPetugas || '-',
+  //   namaKelas: namaKelas || '-',
+  //   totalTabungan: formatRupiah(totalSetoranKelas) || 0,
+  //   totalSiswa: dataSiswa.length || '-',
+  //   transaksiHariIni: totalTransaksi || '-',
+  // };
+
+  const isGlobalLoading = isKelasLoading || isSiswaLoading || isTransaksiLoading || isTanggalLoading;
 
   return (
     <View style={[styles.mainContainer, { backgroundColor: '#f8fafc' }]}>
@@ -150,8 +213,8 @@ export default function HomeScreen() {
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <View>
               <Text style={styles.welcomeText}>Selamat Datang 👋</Text>
-              <Text style={styles.adminName}>{dataRingkasan.namaPetugas}</Text>
-              <Text style={styles.kelasName}>Walikelas : {dataRingkasan.namaKelas}</Text>
+              <Text style={styles.adminName}>{namaPetugasQuery}</Text>
+              <Text style={styles.kelasName}>Walikelas : {namaKelasQuery}</Text>
             </View>
             <TouchableOpacity style={styles.logoutButton} onPress={() => triggerLogoutGlobal()}>
               <FontAwesome name="power-off" size={16} color="#dc2626" />
@@ -161,7 +224,7 @@ export default function HomeScreen() {
           <Text style={styles.subText}>Sistem Penginputan Tabungan Siswa</Text>
         </View>
   
-        {isLoading ? (
+        {isGlobalLoading ? (
           <>
             {/* Skeleton hanya untuk bagian yang fetch data */}
   
@@ -193,7 +256,7 @@ export default function HomeScreen() {
             <View style={styles.balanceCard}>
               <View style={styles.cardInfo}>
                 <Text style={styles.cardTitle}>Total Tabungan Semua Siswa</Text>
-                <Text style={styles.cardBalance}>{dataRingkasan.totalTabungan}</Text>
+                <Text style={styles.cardBalance}>{formatRupiah(totalSetoranKelasQuery)}</Text>
               </View>
               <FontAwesome name="money" size={40} color="#fff" style={styles.cardIcon} />
             </View>
@@ -202,12 +265,12 @@ export default function HomeScreen() {
             <View style={styles.statsRow}>
               <View style={styles.statsBox}>
                 <FontAwesome name="users" size={20} color="#0284c7" />
-                <Text style={styles.statsValue}>{dataRingkasan.totalSiswa}</Text>
+                <Text style={styles.statsValue}>{dataSiswaQuery.length}</Text>
                 <Text style={styles.statsLabel}>Aktif Menabung</Text>
               </View>
               <View style={styles.statsBox}>
                 <FontAwesome name="exchange" size={20} color="#16a34a" />
-                <Text style={styles.statsValue}>{dataRingkasan.transaksiHariIni}</Text>
+                <Text style={styles.statsValue}>{totalTransaksiQuery}</Text>
                 <Text style={styles.statsLabel}>Transaksi Hari Ini</Text>
               </View>
             </View>
