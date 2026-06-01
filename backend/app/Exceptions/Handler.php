@@ -38,4 +38,16 @@ class Handler extends ExceptionHandler
             //
         });
     }
+
+    /**
+     * Memaksa Laravel membuang render HTML View dan mengubahnya menjadi JSON rapi.
+     */
+    public function render($request, Throwable $exception)
+    {
+        return response()->json([
+            'error'   => true,
+            'message' => $exception->getMessage(),
+            'code'    => $exception->getCode()
+        ], 500);
+    }
 }
