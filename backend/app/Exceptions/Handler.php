@@ -44,10 +44,20 @@ class Handler extends ExceptionHandler
      */
     public function render($request, Throwable $exception)
     {
-        return response()->json([
+        // Set header response ke JSON menggunakan PHP Native
+        header('Content-Type: application/json; charset=utf-8');
+        http_response_code(500);
+
+        // Keluarkan teks JSON murni tanpa bantuan helper Laravel
+        echo json_encode([
             'error'   => true,
             'message' => $exception->getMessage(),
+            'file'    => $exception->getFile(),
+            'line'    => $exception->getLine(),
             'code'    => $exception->getCode()
-        ], 500);
+        ]);
+        
+        // Hentikan paksa proses agar Laravel tidak mencari komponen [view]
+        die();
     }
 }
