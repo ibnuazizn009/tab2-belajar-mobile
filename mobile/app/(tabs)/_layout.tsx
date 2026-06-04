@@ -1,9 +1,11 @@
 import { Tabs, router } from 'expo-router';
 import React, { useState, useRef, useEffect } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, PanResponder } from 'react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, PanResponder, ActivityIndicator } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store'
 import {tab2ApiService} from '../../services/Tab2apiservice'
+import { AppToast } from '@/components/ToastProvider'
+
 // Fungsi global agar bisa dipanggil dari file index.tsx (Dashboard) untuk logout
 export let triggerLogoutGlobal = () => {};
 
@@ -14,6 +16,7 @@ export default function TabLayout() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -83,6 +86,7 @@ export default function TabLayout() {
     }
   
     try {
+      setIsSubmitting(true);
       const responseData = await tab2ApiService.postPublic(
         `${process.env.EXPO_PUBLIC_API_URL}/auth/login`,
         { username: username.trim(), password }
@@ -95,6 +99,8 @@ export default function TabLayout() {
       const message = error?.data?.message || 'Username atau password salah.'
       Alert.alert('Login Gagal', message, [{ text: 'Coba Lagi' }])
       console.error('Login error:', error)
+    } finally {
+      setIsSubmitting(false);
     }
   }
   
@@ -144,11 +150,26 @@ export default function TabLayout() {
           </View>
 
           {/* Tombol Submit Login */}
-          <TouchableOpacity style={styles.loginButton} onPress={handleLogin} activeOpacity={0.8}>
-            <Text style={styles.loginButtonText}>Masuk Ke Sistem</Text>
+          <TouchableOpacity 
+            style={styles.loginButton} 
+            onPress={handleLogin} 
+            activeOpacity={0.8}
+            disabled={isSubmitting}
+            >
+            <Text style={styles.loginButtonText}>
+              {isSubmitting ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color="#ffffff" />
+                  <Text style={styles.loginButtonText}>Loading...</Text>
+                </View>
+              ) : (
+                <Text style={styles.loginButtonText}>Masuk Ke Sistem</Text>
+              )}
+            </Text>
             <FontAwesome name="sign-in" size={18} color="#fff" style={{ marginLeft: 8 }} />
           </TouchableOpacity >
         </View>
+        <AppToast topOffset={100} />
       </View>
     );
   }
@@ -302,5 +323,11 @@ const styles = StyleSheet.create({
     color: '#ffffff', 
     fontSize: 16, 
     fontWeight: 'bold' 
+  },
+  loadingContainer: {
+    flexDirection: 'row',     
+    alignItems: 'center',    
+    justifyContent: 'center',  
+    gap: 12,                    
   },
 });

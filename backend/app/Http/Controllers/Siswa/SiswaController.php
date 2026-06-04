@@ -5,11 +5,15 @@ namespace App\Http\Controllers\siswa;
 use App\Http\Controllers\Controller;
 use App\Models\Kelas;
 use App\Models\MasterSiswa;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App;
 
 class SiswaController extends Controller
 {
+    use  App\Traits\ApiResponse\ApiResponse;
+    use App\Traits\LogingSystems\LogingSystems;
     public function getDataKelas(Request $request)
     {
         $kelas = Kelas::where('id', $request->kelasId)->first();
@@ -26,8 +30,8 @@ class SiswaController extends Controller
         $siswa = MasterSiswa::from('master_siswa as ms')
             ->join('kelas as kl', 'kl.id', '=', 'ms.kelas_id')
             ->where('ms.kelas_id', $request->kelasId)
-            ->where('ms.isActive', 1)
-            ->select('ms.nis', 'ms.nama', 'ms.saldo', 'kl.nama_kelas', 'ms.created_at', 'ms.updated_at')
+            // ->where('ms.isActive', 1)
+            ->select('ms.nis', 'ms.nama', 'ms.saldo', 'kl.nama_kelas', 'ms.isActive', 'ms.created_at', 'ms.updated_at')
             ->get();
         return response()->json([
             'data' => $siswa
@@ -105,5 +109,48 @@ class SiswaController extends Controller
             'data' => $Transaksi,
             'total_transaksi' => $totalTransaksi
         ]);
+    }
+
+    public function postTambahSiswa(Request $request)
+    {
+        $updatedAt = Carbon::now('Asia/Jakarta');
+
+        try {
+            $validatedData = $request->validate([
+                'nis'     => 'required|integer',
+                'nama'    => 'required|string',
+                'kelas_id' => 'required|integer|min:1',
+                'saldo' => 'required|integer|min:0',
+                'aktif_menabung' => 'required|integer|in:0,1',
+
+            ]);
+
+            $student = DB::table('master_siswa')
+                ->where('nis', $validatedData['nis'])
+                ->first();
+
+            if ($student) {
+                return $this->resourceNotFoundResponse('Data siswa sudah ada.');
+            }
+
+            $studentId = DB::table('master_siswa')->insert([
+                'nis'        => $validatedData['nis'],
+                'nama'       => $validatedData['nama'],
+                'kelas_id'   => $validatedData['kelas_id'],
+                'saldo'      => $validatedData['saldo'],
+                'isActive'   => $validatedData['aktif_menabung'],
+                'created_at' => $updatedAt,
+                'updated_at' => $updatedAt,
+            ]);
+
+            if ($studentId) {
+                return $this->successResponse('Data Siswa berhasil disimpan', $studentId);
+            } else {
+                return $this->failedResponse('Gagal menyimpan data Siswa');
+            }
+
+        } catch (\Exception $e) {
+            return $this->failedResponse('Error: ' . $e->getMessage());
+        }
     }
 }

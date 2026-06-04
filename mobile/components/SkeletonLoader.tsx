@@ -110,7 +110,7 @@ export const SkeletonTransaksi = () => (
 // SKELETON: Halaman Riwayat (List)
 // ===========================
 export const SkeletonRiwayat = () => (
-  <ScrollView contentContainerStyle={{ padding: 20, paddingTop: 24 }}>
+  <ScrollView contentContainerStyle={{ padding: 5, paddingTop: 5 }}>
     {/* Search bar */}
     <SkeletonBox width='100%' height={44} style={{ borderRadius: 10, marginBottom: 16 }} />
 

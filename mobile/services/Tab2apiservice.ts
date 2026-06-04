@@ -98,7 +98,8 @@ export const tab2ApiService = {
   post: async (
     url: string,
     data: Record<string, any> | FormData,
-    postType: string
+    postType: string,
+    showErrorSnackbar: boolean = true
   ): Promise<any> => {
     const accessToken = await validateToken()
     if (!accessToken) return null
@@ -122,7 +123,7 @@ export const tab2ApiService = {
 
       if (response.ok) {
         showSnackbar(`Berhasil menyimpan ${postType}`, 'success')
-        return responseData
+        return { success: true, message: responseData }
       }
 
       if (response.status === 401) {
@@ -131,8 +132,11 @@ export const tab2ApiService = {
       }
 
       const errorDetails = extractErrorDetails(responseData, 'Gagal menyimpan data')
-      showSnackbar(errorDetails, 'error')
-      throw new Error(`Error: ${response.status} - ${response.statusText}`)
+      if (showErrorSnackbar) {
+        showSnackbar(errorDetails, 'error')
+      }
+      // throw new Error(`Error: ${response.status} - ${response.statusText}`)
+      return { success: false, message: errorDetails }
     } catch (error) {
       console.error('Error post:', error)
       return undefined

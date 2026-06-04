@@ -74,8 +74,15 @@ class TransaksiController extends Controller
             ->join('kelas as kl', 'kl.id', '=', 'ms.kelas_id')
             ->join('tabel_transaksi as tt', function($join) use ($tglAwal, $tglAkhir) {
                 $join->on('tt.nis', '=', 'ms.nis');
+                
                 if ($tglAwal && $tglAkhir) {
-                    $join->whereBetween('tt.created_at', [$tglAwal, $tglAkhir]);
+                    $dateStart = date('Y-m-d', strtotime($tglAwal));
+                    $dateEnd   = date('Y-m-d', strtotime($tglAkhir));
+            
+                    $fullStart = $dateStart . ' 00:00:00';
+                    $fullEnd   = $dateEnd . ' 23:59:59';
+            
+                    $join->whereRaw("tt.created_at BETWEEN ? AND ?", [$fullStart, $fullEnd]);
                 }
             })
             ->where('ms.kelas_id', $kelasId)
@@ -85,10 +92,11 @@ class TransaksiController extends Controller
                 'ms.nama',
                 'ms.saldo',
                 'kl.nama_kelas',
-                'tt.created_at',
+                DB::raw("DATE_FORMAT(tt.created_at, '%Y-%m-%d %H:%i:%s') as tanggal_transaksi"),
                 'tt.nominal',
                 'tt.tipe'
             )
+            ->orderBy('tt.created_at', 'desc')
             ->get();
 
         return response()->json([
