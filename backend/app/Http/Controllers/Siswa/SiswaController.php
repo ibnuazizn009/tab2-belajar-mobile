@@ -5,6 +5,7 @@ namespace App\Http\Controllers\siswa;
 use App\Http\Controllers\Controller;
 use App\Models\Kelas;
 use App\Models\MasterSiswa;
+use App\Models\TabelTransaksi;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -152,5 +153,39 @@ class SiswaController extends Controller
         } catch (\Exception $e) {
             return $this->failedResponse('Error: ' . $e->getMessage());
         }
+    }
+
+    public function getLaporanKeuanganSiswa(Request $request)
+    {
+        $siswa = MasterSiswa::from('master_siswa as ms')
+            ->join('kelas as kl', 'kl.id', '=', 'ms.kelas_id')
+            ->where('ms.kelas_id', $request->kelasId)
+            // ->where('ms.isActive', 1)
+            ->select('ms.nis', 'ms.nama', 'ms.saldo', 'kl.nama_kelas', 'ms.isActive', 'ms.created_at', 'ms.updated_at')
+            ->get();
+        return response()->json([
+            'data' => $siswa
+        ]);
+    }
+
+    public function getLaporanTransaksiSiswa(Request $request)
+    {
+        $nis = $request->input('nis');
+
+        $transaksi = TabelTransaksi::where('nis', $nis)
+            ->orderBy('created_at', 'desc')
+            ->select(
+                'id',
+                'nis',
+                'tipe',    
+                'nominal',
+                'created_at'
+            )
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data'    => $transaksi,
+        ]);
     }
 }

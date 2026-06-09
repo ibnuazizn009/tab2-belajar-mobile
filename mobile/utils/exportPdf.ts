@@ -78,7 +78,7 @@ export const exportDetailTransaksiPdf = async (siswa: { nis: string; nama: strin
         <td>${t.tanggal}</td>
         <td>
             <span style="color:${t.tipe === 'setor' ? '#16a34a' : '#dc2626'};font-weight:bold">
-            ${t.tipe === 'setor' ? '▲ Setor' : '▼ Tarik'}
+              ${t.tipe === 'setor' ? 'Setor' : 'Tarik'}
             </span>
         </td>
         <td style="color:${t.tipe === 'setor' ? '#16a34a' : '#dc2626'};font-weight:bold">
@@ -108,10 +108,28 @@ export const exportDetailTransaksiPdf = async (siswa: { nis: string; nama: strin
     <body>
       <h2>Detail Transaksi Tabungan</h2>
       <div class="info-box">
-        <span>Nama &nbsp;&nbsp;: </span><strong>${siswa.nama}</strong><br/>
-        <span>NIS &nbsp;&nbsp;&nbsp;&nbsp;: </span><strong>${siswa.nis}</strong><br/>
-        <span>Kelas &nbsp;&nbsp;: </span><strong>${siswa.nama_kelas}</strong><br/>
-        <span>Dicetak: </span><strong>${formatTanggal(new Date())}</strong>
+        <table style="border:none;width:auto">
+          <tr>
+            <td style="color:#64748b;padding:2px 0">Nama</td>
+            <td style="padding:2px 4px;color:#64748b">:</td>
+            <td style="font-weight:bold;padding:2px 0">${siswa.nama}</td>
+          </tr>
+          <tr>
+            <td style="color:#64748b;padding:2px 0">NIS</td>
+            <td style="padding:2px 4px;color:#64748b">:</td>
+            <td style="font-weight:bold;padding:2px 0">${siswa.nis}</td>
+          </tr>
+          <tr>
+            <td style="color:#64748b;padding:2px 0">Kelas</td>
+            <td style="padding:2px 4px;color:#64748b">:</td>
+            <td style="font-weight:bold;padding:2px 0">${siswa.nama_kelas}</td>
+          </tr>
+          <tr>
+            <td style="color:#64748b;padding:2px 0">Dicetak</td>
+            <td style="padding:2px 4px;color:#64748b">:</td>
+            <td style="font-weight:bold;padding:2px 0">${formatTanggal(new Date())}</td>
+          </tr>
+        </table>
       </div>
       <table>
         <thead>
