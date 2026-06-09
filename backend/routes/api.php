@@ -3,6 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\MasterController;
 use App\Http\Controllers\Siswa\SiswaController;
 use App\Http\Controllers\Siswa\TransaksiController;
 
@@ -21,6 +22,11 @@ $prefix = 'services/tab2one';
 
 // Public routes
 Route::post("$prefix/auth/login", [AuthController::class, 'login']);
+Route::post("$prefix/auth/register", [AuthController::class, 'register']);
+
+Route::get("$prefix/master/kelas", [MasterController::class, 'getAllKelas']);
+Route::get("$prefix/master/kota", [MasterController::class, 'getAllKota']);
+Route::get("$prefix/master/sekolah-by-kota", [MasterController::class, 'getSekolahByKota']);
 
 Route::middleware('auth.jwt')->group(function () use ($prefix) {
     Route::post("$prefix/auth/logout",  [AuthController::class, 'logout']);

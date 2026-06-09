@@ -1,19 +1,24 @@
 import { Tabs, router } from 'expo-router';
 import React, { useState, useRef, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, PanResponder, ActivityIndicator } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store'
 import {tab2ApiService} from '../../services/Tab2apiservice'
 import { AppToast } from '@/components/ToastProvider'
-
+import LoginView from '@/components/LoginView';
+import RegisterView from '@/components/RegisterView';
 // Fungsi global agar bisa dipanggil dari file index.tsx (Dashboard) untuk logout
 export let triggerLogoutGlobal = () => {};
 
 const TIMEOUT_IDLE = 30 * 60 * 1000;
 
 export default function TabLayout() {
+  const queryClient = useQueryClient();
   // State Keamanan Utama untuk Login Manual
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [authScreen, setAuthScreen] = useState<'login' | 'register'>('login');
+
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -35,15 +40,22 @@ export default function TabLayout() {
   };
 
   // Fungsi eksekusi ketika waktu idle habis
-  const handleAutoLogout = () => {
-    setIsLoggedIn(false);
-    setUsername('');
-    setPassword('');
-    Alert.alert(
-      "Sesi Berakhir",
-      "Anda telah otomatis keluar karena tidak ada aktivitas selama 30 menit demi keamanan data.",
-      [{ text: "Mengerti" }]
-    );
+  const handleAutoLogout = async () => {
+    try {
+      await SecureStore.deleteItemAsync('access_token');
+      await SecureStore.deleteItemAsync('user_info');
+      
+      setIsLoggedIn(false);
+
+      Alert.alert(
+        "Sesi Berakhir",
+        "Anda telah otomatis keluar karena tidak ada aktivitas selama beberapa saat demi keamanan data.",
+        [{ text: "Mengerti" }]
+      );
+    } catch (error) {
+      console.error("Gagal menghapus sesi saat auto logout:", error);
+      setIsLoggedIn(false);
+    }
   };
 
   // Menghubungkan pemicu fungsi logout global ke state lokal layout
@@ -89,88 +101,57 @@ export default function TabLayout() {
       setIsSubmitting(true);
       const responseData = await tab2ApiService.postPublic(
         `${process.env.EXPO_PUBLIC_API_URL}/auth/login`,
-        { username: username.trim(), password }
+        { username: username.trim(), password }, 
+        'auth'
       )
+    
+      if (responseData && responseData.success) {
+        
+        const loginData = responseData.data; 
   
-      await SecureStore.setItemAsync('access_token', responseData.access_token)
-      await SecureStore.setItemAsync('user_info', JSON.stringify(responseData.user))
-      setIsLoggedIn(true)
+        if (loginData && loginData.access_token) {
+          await SecureStore.setItemAsync('access_token', loginData.access_token)
+          await SecureStore.setItemAsync('user_info', JSON.stringify(loginData.user || loginData.petugas || {}))
+          
+          await queryClient.invalidateQueries({ queryKey: ['userInfo'] });
+          setIsLoggedIn(true)
+        } else {
+          Alert.alert('Login Gagal', 'Token tidak ditemukan dari server.')
+        }
+  
+      } else {
+        Alert.alert('Login Gagal', responseData.message || 'Username atau password salah.')
+      }
+  
     } catch (error: any) {
-      const message = error?.data?.message || 'Username atau password salah.'
-      Alert.alert('Login Gagal', message, [{ text: 'Coba Lagi' }])
       console.error('Login error:', error)
+      Alert.alert('Login Gagal', 'Terjadi kesalahan sistem atau jaringan.')
     } finally {
       setIsSubmitting(false);
     }
   }
   
   if (!isLoggedIn) {
+    if (authScreen === 'register') {
+      return (
+        <RegisterView 
+          onSwitchToLogin={() => setAuthScreen('login')} 
+          styles={styles} 
+        />
+      );
+    }
+
     return (
-      <View style={styles.loginContainer}>
-        <View style={styles.loginCard}>
-          {/* Ikon Header Sistem */}
-          <View style={styles.loginIconWrapper}>
-            <FontAwesome name="bank" size={40} color="#0284c7" />
-          </View>
-          
-          <Text style={styles.loginTitle}>E-Tabungan Siswa</Text>
-          <Text style={styles.loginSubTitle}>Silakan masuk ke akun petugas Anda</Text>
-
-          {/* Form Input Username */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Username</Text>
-            <View style={styles.inputWrapper}>
-              <FontAwesome name="user" size={18} color="#94a3b8" style={styles.inputIcon} />
-              <TextInput 
-                style={styles.textInput}
-                placeholder="Masukkan username"
-                placeholderTextColor="#94a3b8"
-                value={username}
-                onChangeText={setUsername}
-                autoCapitalize="none"
-              />
-            </View>
-          </View>
-
-          {/* Form Input Password */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Password</Text>
-            <View style={styles.inputWrapper}>
-              <FontAwesome name="lock" size={18} color="#94a3b8" style={styles.inputIcon} />
-              <TextInput 
-                style={styles.textInput}
-                placeholder="Masukkan password"
-                placeholderTextColor="#94a3b8"
-                secureTextEntry={true}
-                value={password}
-                onChangeText={setPassword}
-                autoCapitalize="none"
-              />
-            </View>
-          </View>
-
-          {/* Tombol Submit Login */}
-          <TouchableOpacity 
-            style={styles.loginButton} 
-            onPress={handleLogin} 
-            activeOpacity={0.8}
-            disabled={isSubmitting}
-            >
-            <Text style={styles.loginButtonText}>
-              {isSubmitting ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="small" color="#ffffff" />
-                  <Text style={styles.loginButtonText}>Loading...</Text>
-                </View>
-              ) : (
-                <Text style={styles.loginButtonText}>Masuk Ke Sistem</Text>
-              )}
-            </Text>
-            <FontAwesome name="sign-in" size={18} color="#fff" style={{ marginLeft: 8 }} />
-          </TouchableOpacity >
-        </View>
-        <AppToast topOffset={100} />
-      </View>
+      <LoginView
+        username={username}
+        setUsername={setUsername}
+        password={password}
+        setPassword={setPassword}
+        handleLogin={handleLogin}
+        isSubmitting={isSubmitting}
+        styles={styles}
+        onSwitchToRegister={() => setAuthScreen('register')}
+      />
     );
   }
 

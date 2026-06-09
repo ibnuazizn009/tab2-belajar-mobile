@@ -145,30 +145,33 @@ export const tab2ApiService = {
 
   postPublic: async (
     url: string,
-    data: Record<string, any>
+    data: Record<string, any>,
+    postType: string
   ): Promise<any> => {
-    let response: Response | undefined
-  
     try {
-      response = await fetch(url, {
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Accept: 'application/json',
+          Accept: 'application/json'
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(data)
       })
+  
+      const responseData = await response.json()
+  
+      if (response.ok) {
+        // 💡 UBAH DI SINI: Kembalikan responseData utuh agar token & data user dari Laravel tidak hilang
+        return { success: true, data: responseData }
+      }
+  
+      const errorDetails = responseData.message || 'Gagal menyimpan data'
+      return { success: false, message: errorDetails }
+  
     } catch (error) {
-      console.error('Error postPublic network:', error)
-      throw error
+      console.error('Error postPublic:', error)
+      return { success: false, message: 'Terjadi kesalahan jaringan' }
     }
-  
-    const responseData = await response.json()
-  
-    if (response.ok) return responseData
-    console.log('Server response:', JSON.stringify(responseData, null, 2)) 
-  
-    throw { status: response.status, data: responseData }
   },
   
 
@@ -266,6 +269,38 @@ export const tab2ApiService = {
           'Content-Type': 'application/json',
           Accept: 'application/json',
           Authorization: `Bearer ${accessToken}`
+        }
+      })
+
+      const responseData = await response.json()
+
+      if (response.ok) {
+        showSnackbarNonMessage('success')
+        return responseData
+      }
+
+      if (response.status === 401) {
+        if (handleTokenExpired) handleTokenExpired()
+        return undefined
+      }
+
+      showSnackbarNonMessage('error')
+      throw new Error(`Error: ${response.status} - ${response.statusText}`)
+    } catch (error) {
+      console.error('Error getNonMessage:', error)
+      showSnackbarNonMessage('error')
+      throw error
+    }
+  },
+
+  getNonMessageNoAuth: async (url: string, postType: string): Promise<any> => {
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          // Authorization: `Bearer ${accessToken}`
         }
       })
 

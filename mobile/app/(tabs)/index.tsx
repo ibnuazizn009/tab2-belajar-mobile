@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { router, useFocusEffect } from 'expo-router';
 import * as SecureStore from 'expo-secure-store'
 import { useQuery } from '@tanstack/react-query';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { useQueryClient } from '@tanstack/react-query';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 // Menggunakan standar baru Expo Router untuk area aman layar
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,6 +15,8 @@ import { SkeletonHome, SkeletonBox } from '../../components/SkeletonLoader';
 export default function HomeScreen() {
   // Mengambil data padding notch/status bar secara dinamis & akurat
   const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
+  const [refreshing, setRefreshing] = useState(false);
 
   const hariIni = new Date().toISOString().split('T')[0]; 
 
@@ -54,7 +57,7 @@ export default function HomeScreen() {
   });
 
   // ==================== QUERY 3: Load Data Siswa (Menghitung Total Siswa) ====================
-  const { data: dataSiswaQuery = [], isLoading: isSiswaLoading } = useQuery({
+  const { data: dataSiswaQuery = [], isFetching: isSiswaLoading } = useQuery({
     queryKey: ['dataSiswa', kelasIdQuery],
     queryFn: async () => {
       const responseData = await tab2ApiService.getNonMessage(
@@ -68,7 +71,7 @@ export default function HomeScreen() {
   });
 
   // ==================== QUERY 4: Load Total Transaksi Siswa (Saldo) ====================
-  const { data: totalSetoranKelasQuery = 0, isLoading: isTransaksiLoading } = useQuery({
+  const { data: totalSetoranKelasQuery = 0, isFetching: isTransaksiLoading } = useQuery({
     queryKey: ['totalTabunganSiswa', kelasIdQuery],
     queryFn: async () => {
       const responseData = await tab2ApiService.getNonMessage(
@@ -82,7 +85,7 @@ export default function HomeScreen() {
   });
 
   // ==================== QUERY 5: Load Transaksi Tanggal (Hari ini) ====================
-  const { data: totalTransaksiQuery = 0, isLoading: isTanggalLoading } = useQuery({
+  const { data: totalTransaksiQuery = 0, isFetching: isTanggalLoading } = useQuery({
     queryKey: ['transaksiHariIni', kelasIdQuery],
     queryFn: async () => {
       const responseData = await tab2ApiService.getNonMessage(
@@ -95,110 +98,18 @@ export default function HomeScreen() {
     staleTime: 0,
   });
 
-  // const loadKelas = async (idYangDipilih: string) => {
-  //   try {
-  //     const responseData = await tab2ApiService.getNonMessage(
-  //       `${process.env.EXPO_PUBLIC_API_URL}/siswa/kelas?kelasId=${idYangDipilih}`,
-  //       'kelas'
-  //     )
-  //     setNamaKelas(responseData.nama_kelas);
-  //   } catch (error: any) {
-  //     const message = error?.data?.message || 'Tidak ada data kelas'
-  //     console.error('Load kelas error:', error)
-  //   }
-  // }
-
-  // const loadDataSiswa = async (idYangDipilih: string) => {
-  //   try {
-  //     const responseData = await tab2ApiService.getNonMessage(
-  //       `${process.env.EXPO_PUBLIC_API_URL}/siswa/siswa-per-kelas?kelasId=${idYangDipilih}`,
-  //       'siswa'
-  //     )
-  //     setDataSiswa(responseData.data || []);
-
-  //   } catch (error: any) {
-  //     const message = error?.data?.message || 'Tidak ada data siswa'
-  //     console.error('Load siswa error:', error)
-  //   }
-  // }
-
-  // const loadTransaksiSiswa = async (idYangDipilih: string) => {
-  //   try {
-  //     const responseData = await tab2ApiService.getNonMessage(
-  //       `${process.env.EXPO_PUBLIC_API_URL}/siswa/transaksi-per-kelas?kelasId=${idYangDipilih}`,
-  //       'siswa'
-  //     );
   
-  //     if (responseData && responseData.data) {
-  //       const dataSiswa = responseData.data;
-  //       // setListSiswa(dataSiswa);
-  
-  //       setTotalSetoranKelas(dataSiswa.totalTabungan);
-  //     }
-  //   } catch (error) {
-  //     console.error('Load transaksi siswa error:', error);
-  //   }
-  // };
-
-  // const loadTransaksiTanggal = async (idYangDipilih: string) => {
-  //   try {
-  //     const responseData = await tab2ApiService.getNonMessage(
-  //       `${process.env.EXPO_PUBLIC_API_URL}/siswa/transaksi-tanggal?kelasId=${idYangDipilih}&tgl_awal=${tglAwalFormat}&tgl_akhir=${tglAkhirFormat}`,
-  //       'siswa'
-  //     );
-  
-  //     if (responseData && responseData.data) {
-  //       const totalTransaksi = responseData.total_transaksi ?? 0;
-  //       // setListSiswa(dataSiswa);
-  
-  //       setTotalTransaksi(totalTransaksi);
-  //     }
-  //   } catch (error) {
-  //     console.error('Load transaksi siswa error:', error);
-  //   }
-  // };
-  
-
-  // useFocusEffect(
-  //   useCallback(() => {
-  //     const initializeData = async () => {
-  //       setIsLoading(true);
-  //       try {
-  //         const raw = await SecureStore.getItemAsync('user_info')
-          
-  //         if (raw) {
-  //           const user = JSON.parse(raw)
-  //           setNamaPetugas(user.nama_petugas)
-  //           setKelasId(user.kelas_id)
-            
-  //           await loadKelas(user.kelas_id)
-  //           await loadDataSiswa(user.kelas_id)
-  //           await loadTransaksiSiswa(user.kelas_id)
-  //           await loadTransaksiTanggal(user.kelas_id)
-  //         }
-  //       } catch (error) {
-  //         console.error('Gagal inisialisasi data:', error)
-  //       }finally {
-  //         setIsLoading(false); // selesai loading (berhasil maupun gagal)
-  //       }
-  
-  //     }
-    
-  //     initializeData()
-  //   }, []) // [] = tidak ada dependency, jadi hanya re-run saat tab difokus
-  // );
-
-  
-  // const dataRingkasan = {
-  //   namaPetugas: namaPetugas || '-',
-  //   namaKelas: namaKelas || '-',
-  //   totalTabungan: formatRupiah(totalSetoranKelas) || 0,
-  //   totalSiswa: dataSiswa.length || '-',
-  //   transaksiHariIni: totalTransaksi || '-',
-  // };
-
   const isGlobalLoading = isKelasLoading || isSiswaLoading || isTransaksiLoading || isTanggalLoading;
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await queryClient.invalidateQueries({ queryKey: ['dataSiswa', kelasIdQuery] });
+    await queryClient.invalidateQueries({ queryKey: ['totalTabunganSiswa', kelasIdQuery] });
+    await queryClient.invalidateQueries({ queryKey: ['transaksiHariIni', kelasIdQuery] });
+    setRefreshing(false);
+  }, [kelasIdQuery]);
+
+  
   return (
     <View style={[styles.mainContainer, { backgroundColor: '#f8fafc' }]}>
       <ScrollView 
@@ -207,6 +118,17 @@ export default function HomeScreen() {
           styles.contentContainer, 
           { paddingTop: (insets.top || 20) + 40 }
         ]}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#0284c7']}
+            tintColor="#0284c7"
+            progressViewOffset={120}
+            // size={"default" as any}
+            // style={{ transform: [{ scale: 1.2 }] }}
+          />
+        }      
       >
         {/* Header - SELALU TAMPIL, tidak skeleton */}
         <View style={styles.headerSection}>
@@ -268,11 +190,14 @@ export default function HomeScreen() {
                 <Text style={styles.statsValue}>{dataSiswaQuery.length}</Text>
                 <Text style={styles.statsLabel}>Aktif Menabung</Text>
               </View>
-              <View style={styles.statsBox}>
+              <TouchableOpacity 
+                style={styles.statsBox}
+                onPress={() => router.navigate('/(tabs)/riwayat')}
+              >
                 <FontAwesome name="exchange" size={20} color="#16a34a" />
                 <Text style={styles.statsValue}>{totalTransaksiQuery}</Text>
                 <Text style={styles.statsLabel}>Transaksi Hari Ini</Text>
-              </View>
+              </TouchableOpacity>
             </View>
           </>
         )}
