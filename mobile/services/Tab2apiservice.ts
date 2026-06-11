@@ -159,7 +159,7 @@ export const tab2ApiService = {
       })
   
       const responseData = await response.json()
-  
+      
       if (response.ok) {
         // 💡 UBAH DI SINI: Kembalikan responseData utuh agar token & data user dari Laravel tidak hilang
         return { success: true, data: responseData }
@@ -273,7 +273,6 @@ export const tab2ApiService = {
       })
 
       const responseData = await response.json()
-
       if (response.ok) {
         showSnackbarNonMessage('success')
         return responseData
@@ -285,9 +284,12 @@ export const tab2ApiService = {
       }
 
       showSnackbarNonMessage('error')
-      throw new Error(`Error: ${response.status} - ${response.statusText}`)
-    } catch (error) {
-      console.error('Error getNonMessage:', error)
+      
+      const serverErrorMessage = responseData?.message || response.statusText || 'Unknown Error';
+      throw new Error(`Error: ${response.status} - ${serverErrorMessage}`)
+
+    } catch (error: any) {
+      console.error('Error getNonMessage:', error.message || error)
       showSnackbarNonMessage('error')
       throw error
     }

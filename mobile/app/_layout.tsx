@@ -5,9 +5,9 @@ import { Slot ,Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
-import Toast, { BaseToast, ErrorToast, ToastConfig } from 'react-native-toast-message';
+import Toast, { ToastConfig } from 'react-native-toast-message';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-
+import { toastConfig } from '@/components/Tab2ToastConfig';
 import { useColorScheme } from '@/components/useColorScheme';
 
 export {
@@ -24,29 +24,6 @@ export const unstable_settings = {
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
-
-const toastConfig: ToastConfig = {
-  success: (props) => (
-    <BaseToast
-      {...props}
-      style={[{ borderLeftColor: '#16a34a', height: 'auto', minHeight: 70, paddingVertical: 10, zIndex: 9999, elevation: 9999 }, props.props?.style]}
-      contentContainerStyle={{ paddingHorizontal: 15 }}
-      text1Style={{ fontSize: 16, fontWeight: 'bold', color: '#1e293b' }}
-      text2Style={{ fontSize: 13, color: '#475569' }}
-      text2NumberOfLines={2}
-    />
-  ),
-  error: (props) => (
-    <ErrorToast
-      {...props}
-      style={[{ borderLeftColor: '#dc2626', height: 'auto', minHeight: 70, paddingVertical: 10, zIndex: 9999, elevation: 9999 }, props.props?.style]}
-      contentContainerStyle={{ paddingHorizontal: 15 }}
-      text1Style={{ fontSize: 16, fontWeight: 'bold', color: '#1e293b' }}
-      text2Style={{ fontSize: 13, color: '#475569' }}
-      text2NumberOfLines={3}
-    />
-  ),
-};
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
@@ -82,7 +59,8 @@ function RootLayoutNav() {
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
           </Stack>
-          {/* <Toast config={toastConfig} topOffset={100} /> */}
+          <Toast config={toastConfig} topOffset={80} />
+          {/* <Toast config={toastConfig} position="bottom" bottomOffset={100} /> */}
       </QueryClientProvider>
     </ThemeProvider>
   );

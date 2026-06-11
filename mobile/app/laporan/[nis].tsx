@@ -1,30 +1,30 @@
-import React, {useState} from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { StyleSheet, Text, View, TextInput, FlatList, TouchableOpacity, ScrollView, RefreshControl } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, RefreshControl, Alert } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { exportDetailTransaksiPdf } from '../../utils/exportPdf';
-import {tab2ApiService} from '../../services/Tab2apiservice'
+import { tab2ApiService } from '../../services/Tab2apiservice';
 import { SkeletonTransaksi } from '../../components/SkeletonLoader';
-import { formatRupiah, formatTanggalIndo, formatTanggalDisplay } from '../../utils/formatTanggal';
-
-const DUMMY_TRANSAKSI: Record<string, any[]> = {
-  '202601001': [
-    { id: '1', tipe: 'setor', nominal: 'Rp 100.000', tanggal: '01 Jun 2025' },
-    { id: '2', tipe: 'setor', nominal: 'Rp 200.000', tanggal: '10 Jun 2025' },
-    { id: '3', tipe: 'tarik', nominal: 'Rp 50.000',  tanggal: '15 Jun 2025' },
-    { id: '4', tipe: 'setor', nominal: 'Rp 200.000', tanggal: '20 Jun 2025' },
-  ],
-  '202601002': [
-    { id: '1', tipe: 'setor', nominal: 'Rp 500.000', tanggal: '05 Jun 2025' },
-    { id: '2', tipe: 'setor', nominal: 'Rp 700.000', tanggal: '18 Jun 2025' },
-  ],
-};
+import { formatRupiah, formatTanggalIndo } from '../../utils/formatTanggal';
+import { CHECK_FEATURE } from '@/constants/Features'; // 🎯 Import helper penentu bisnis tiering
 
 export default function DetailTransaksiScreen() {
   const { nis, nama, nama_kelas, saldo: saldoStr } = useLocalSearchParams<{ nis: string; nama: string, nama_kelas: string, saldo: string }>();
   const saldo = Number(saldoStr) || 0;
   const [isExporting, setIsExporting] = useState(false);
+  
+  // 🎯 State lokal penampung hak akses user login
+  const [userInfo, setUserInfo] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const raw = await SecureStore.getItemAsync('user_info');
+      if (raw) setUserInfo(JSON.parse(raw));
+    };
+    fetchUser();
+  }, []);
 
   const { data: transaksi = [], isLoading, isRefetching, refetch } = useQuery({
     queryKey: ['detailTransaksiSiswa', nis],
@@ -46,19 +46,33 @@ export default function DetailTransaksiScreen() {
     staleTime: 0,
   });
 
+  // 🎯 Proteksi Fitur Cetak PDF Riwayat Siswa
   const handleExport = async () => {
-      try {
-          setIsExporting(true);
-          await exportDetailTransaksiPdf(
-          { nis, nama, nama_kelas, saldo },
+    const isAllowedToDownload = CHECK_FEATURE(userInfo?.paket_layanan, 'DOWNLOAD_REPORT');
+
+    if (!isAllowedToDownload) {
+      Alert.alert(
+        '🔒 Fitur Premium Terkunci',
+        'Fitur cetak cetak PDF riwayat detail transaksi ini hanya tersedia pada paket Golden All Akses. Silakan hubungi manajemen atau Admin Utama sekolah untuk upgrade layanan!'
+      );
+      return;
+    }
+
+    try {
+        setIsExporting(true);
+        await exportDetailTransaksiPdf(
+          { nis, nama: nama, nama_kelas, saldo },
           transaksi
-          );
-      } catch (e) {
-          console.error('Export error:', e);
-      } finally {
-          setIsExporting(false);
-      }
+        );
+    } catch (e) {
+        console.error('Export error:', e);
+    } finally {
+        setIsExporting(false);
+    }
   };
+
+  // Cek kasta paket untuk manajemen warna tombol UI
+  const isGoldenTier = CHECK_FEATURE(userInfo?.paket_layanan, 'DOWNLOAD_REPORT');
 
   return (
     <>
@@ -83,19 +97,22 @@ export default function DetailTransaksiScreen() {
           <FontAwesome name="user-circle" size={40} color="#0284c7" />
           <View style={{ marginLeft: 12 }}>
             <Text style={styles.namaText}>{nama}</Text>
-            <Text style={styles.nisText}>NIS: {nis}</Text>
+            <Text style={styles.nisText}>NIS: {nis} • Kelas {nama_kelas}</Text>
           </View>
         </View>
 
-        {/* Export Button */}
+        {/* 🎯 Export Button Interaktif Berdasarkan Paket */}
         <TouchableOpacity
-          style={styles.exportButton}
+          style={[
+            styles.exportButton,
+            !isGoldenTier && { backgroundColor: '#94a3b8' } // Ubah abu-abu jika Free / Middle
+          ]}
           onPress={handleExport}
           disabled={isExporting || transaksi.length === 0}
         >
-          <FontAwesome name="file-pdf-o" size={15} color="#fff" />
+          <FontAwesome name={isGoldenTier ? "file-pdf-o" : "lock"} size={15} color="#fff" />
           <Text style={styles.exportText}>
-            {isExporting ? 'Mengexport...' : 'Export PDF'}
+            {isExporting ? 'Mengexport...' : isGoldenTier ? 'Export PDF Transaksi' : 'PDF (Hanya Paket Golden)'}
           </Text>
         </TouchableOpacity>
 

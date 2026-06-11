@@ -1,22 +1,20 @@
-import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import * as SecureStore from 'expo-secure-store'
-import { StyleSheet, Text, View, TextInput, FlatList, TouchableOpacity, ScrollView, RefreshControl } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import * as SecureStore from 'expo-secure-store';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView, RefreshControl } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { Stack, router } from 'expo-router';
-import {tab2ApiService} from '../../services/Tab2apiservice'
+import { tab2ApiService } from '../../services/Tab2apiservice';
 import { SkeletonRiwayat } from '../../components/SkeletonLoader';
-
-const DATA_SISWA = [
-  { id: '1', nis: '202601001', nama_keals: '1A', nama: 'Aditya Pratama', saldo: 450000 },
-  { id: '2', nis: '202601002', nama_keals: '1A', nama: 'Budi Santoso', saldo: 1200000 },
-  { id: '3', nis: '202601003', nama_keals: '1A', nama: 'Citra Lestari', saldo: 320000 },
-];
 
 export default function LaporanScreen() {
   const [search, setSearch] = useState('');
   const [laporanKeuangan, setLaporanKeuangan] = useState<any[]>([]);
-  const [refreshing, setRefreshing] = useState(false)
+  const [refreshing, setRefreshing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [kelasId, setKelasId] = useState('');
+  
+  // 🎯 State menampung data user murni dari SecureStore
+  const [userInfo, setUserInfo] = useState<any>(null);
 
   const formatRupiah = (angka: number | string) => {
     if (!angka) return 'Rp 0';
@@ -24,55 +22,55 @@ export default function LaporanScreen() {
     return `Rp ${format}`;
   };
 
-  const onRefresh = async () => {
-    setRefreshing(true);
+  const loadLaporanKeuangan = async (idKelas: string) => {
+    if (!idKelas) return;
     try {
-      await refetchLaporanKeuangan();
+      setIsLoading(true);
+      const responseData = await tab2ApiService.getNonMessage(
+        `${process.env.EXPO_PUBLIC_API_URL}/siswa/laporan-keuangan-siswa?kelasId=${idKelas}`,
+        'siswa'
+      );
+      setLaporanKeuangan(responseData.data || []);
     } catch (error) {
-      console.log("Gagal memperbarui riwayat transaksi:", error);
+      console.log("Gagal memuat laporan keuangan:", error);
     } finally {
-      setRefreshing(false);
+      setIsLoading(false);
     }
   };
 
-  const { data: userInfo } = useQuery({
-    queryKey: ['userInfo'],
-    queryFn: async () => {
-      const raw = await SecureStore.getItemAsync('user_info');
-      return raw ? JSON.parse(raw) : null;
-    },
-    staleTime: Infinity,
-  });
-
-  const kelasIdQuery = userInfo?.kelas_id;
-
-  const { data: riwayatTransaksiQuery = [], isLoading: isLaporanlLoading, isRefetching, refetch: refetchLaporanKeuangan } = useQuery({
-    queryKey: ['laporanKeuanganSiswa', kelasIdQuery],
-    queryFn: async () => {
-      const responseData = await tab2ApiService.getNonMessage(
-        `${process.env.EXPO_PUBLIC_API_URL}/siswa/laporan-keuangan-siswa?kelasId=${kelasIdQuery}`,
-        'siswa'
-      );
-      return responseData.data || [];
-    },
-    enabled: !!kelasIdQuery,
-    staleTime: 0,
-  });
-
-  
-
-  const filteredData = (riwayatTransaksiQuery || []).filter((item: any) =>
-    item.nama.toLowerCase().includes(search.toLowerCase()) || item.nis.includes(search)
-  );
-
-  const handleCariTanggal = () => {
-    // Panggil refetchRiwayat untuk memaksa React Query menarik data berdasarkan tanggal baru
-    refetchLaporanKeuangan();
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadLaporanKeuangan(kelasId);
+    setRefreshing(false);
   };
+
+  useEffect(() => {
+    const initializeData = async () => {
+      try {
+        const raw = await SecureStore.getItemAsync('user_info');
+        if (raw) {
+          const user = JSON.parse(raw);
+          setUserInfo(user);
+          setKelasId(user.kelas_id);
+          await loadLaporanKeuangan(user.kelas_id);
+        }
+      } catch (error) {
+        console.error('Gagal inisialisasi user di Laporan:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initializeData();
+  }, []);
+
+  const filteredData = laporanKeuangan.filter((item: any) =>
+    item.nama_siswa.toLowerCase().includes(search.toLowerCase()) || item.nis.includes(search)
+  );
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Laporan' }} />
+      <Stack.Screen options={{ title: 'Laporan Tabungan' }} />
       <ScrollView
         style={styles.container}
         contentContainerStyle={[{ flexGrow: 1 }, styles.contentContainer]}
@@ -102,7 +100,7 @@ export default function LaporanScreen() {
         </View>
 
         {/* List Siswa */}
-        {isLaporanlLoading || isRefetching ? (
+        {isLoading ? (
           <SkeletonRiwayat />
         ) : (
           <View style={{ paddingBottom: 40 }}>
@@ -121,7 +119,7 @@ export default function LaporanScreen() {
                       pathname: '/laporan/[nis]',
                       params: {
                         nis: item.nis,
-                        nama: item.nama,
+                        nama: item.nama_siswa,
                         nama_kelas: item.nama_kelas,
                         saldo: item.saldo,
                       },
@@ -132,7 +130,7 @@ export default function LaporanScreen() {
                     <FontAwesome name="user-circle" size={36} color="#0284c7" />
                   </View>
                   <View style={styles.infoSection}>
-                    <Text style={styles.siswaNama}>{item.nama}</Text>
+                    <Text style={styles.siswaNama}>{item.nama_siswa}</Text>
                     <Text style={styles.siswaDetail}>NIS: {item.nis}</Text>
                   </View>
                   <View style={styles.saldoSection}>
@@ -142,7 +140,6 @@ export default function LaporanScreen() {
                   <FontAwesome name="chevron-right" size={14} color="#94a3b8" style={{ marginLeft: 8 }} />
                 </TouchableOpacity>
               ))
-              
             )}
           </View>
         )}
@@ -157,7 +154,6 @@ const styles = StyleSheet.create({
   searchWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f1f5f9', borderRadius: 10, paddingHorizontal: 12, height: 40 },
   searchIcon: { marginRight: 8 },
   searchInput: { flex: 1, fontSize: 14, color: '#1e293b' },
-  
   siswaCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', padding: 16, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: '#f1f5f9', elevation: 1 },
   profileBadge: { marginRight: 12 },
   infoSection: { flex: 1 },
@@ -168,8 +164,5 @@ const styles = StyleSheet.create({
   saldoValue: { fontSize: 14, fontWeight: 'bold', color: '#16a34a', marginTop: 2 },
   emptyState: { alignItems: 'center', marginTop: 40 },
   emptyText: { color: '#94a3b8', fontSize: 14, marginTop: 10 },
-  contentContainer: { 
-    padding: 5,
-    paddingBottom: 40,
-  },
+  contentContainer: { padding: 5, paddingBottom: 40 }
 });

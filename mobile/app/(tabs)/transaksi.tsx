@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import * as SecureStore from 'expo-secure-store'
 import { useLocalSearchParams } from 'expo-router';
-import Toast from 'react-native-toast-message';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, RefreshControl } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
-import {tab2ApiService} from '../../services/Tab2apiservice'
+import { tab2ApiService } from '../../services/Tab2apiservice'
 import { AppToast } from '@/components/ToastProvider'
 import { Dropdown } from 'react-native-element-dropdown';
+import { tab2Toast } from '@/utils/tab2Toast';
 
 export default function TransaksiScreen() {
   const { defaultTipe, hideOther } = useLocalSearchParams<{ 
@@ -20,55 +20,62 @@ export default function TransaksiScreen() {
   const [nama, setNama] = useState('');
   const [tipe, setTipe] = useState<'setor' | 'tarik' | ''>(defaultTipe || '');
   const [nominal, setNominal] = useState('');
-  const [kelasId, setKelasId] = useState('');
   const [listSiswa, setListSiswa] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-
-  const onRefresh = React.useCallback(async () => {
-    setRefreshing(true);
-    try {
-      // 💡 Masukkan fungsi penjemput data API kamu di sini, contoh:
-      // await fetchListSiswa(); 
-      
-      // Opsional: Reset form jika ingin dikosongkan saat di-refresh
-      setNis('');
-      setNama('');
-      setNominal('');
-    } catch (error) {
-      console.error("Gagal refresh data:", error);
-    } finally {
-      setRefreshing(false);
-    }
-  }, []);
 
   const formatInputNominal = (value: string) => {
     const nomorMurni = value.replace(/\D/g, '');
     return nomorMurni.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   };
 
+  const loadDataSiswa = async (idYangDipilih: string) => {
+    try {
+      const responseData = await tab2ApiService.getNonMessage(
+        `${process.env.EXPO_PUBLIC_API_URL}/siswa/siswa-per-kelas?kelasId=${idYangDipilih}`,
+        'siswa'
+      );
+      // Sinkronisasi data dari API ke dropdown
+      if (responseData && responseData.data) {
+        setListSiswa(responseData.data || []);
+      }
+    } catch (error) {
+      console.error('Load siswa error:', error);
+    }
+  };
+
   const postTransaksiData = async() => {
-    if (!nis.trim()) return;
-    if (!tipe) return;
-    if (!nominal || Number(nominal) <= 0) return;
+    if (!nis.trim()) {
+      tab2Toast.error('Siswa Belum Dipilih', 'Pilih siswa terlebih dahulu.');
+      return;
+    }
+    if (!tipe) {
+      tab2Toast.error('Tipe Belum Dipilih', 'Pilih jenis transaksi.');
+      return;
+    }
+    if (!nominal || Number(nominal) <= 0) {
+      tab2Toast.error('Nominal Tidak Valid', 'Masukkan nominal yang benar.');
+      return;
+    }
   
     try {
-      setIsSubmitting(true)
+      setIsSubmitting(true);
       setLoading(true);
-
+  
       const payload = {
         nis: nis,
         tipe: tipe,
-        nominal: Number(nominal), // Konversi string input ke angka
+        nominal: Number(nominal),
+        nama_siswa: nama
       };
-
+  
       const response = await tab2ApiService.post(
         `${process.env.EXPO_PUBLIC_API_URL}/transaksi/transaksi`,
         payload,
         'transaksi' 
       );
-
+  
       if (response && response.success) {
         queryClient.invalidateQueries({ queryKey: ['totalTabunganSiswa'] });
         queryClient.invalidateQueries({ queryKey: ['transaksiHariIni'] });
@@ -76,197 +83,49 @@ export default function TransaksiScreen() {
         setNama('');
         setTipe('');
         setNominal('');
+  
+        tab2Toast.success(
+          tipe === 'setor' ? 'Setoran Berhasil' : 'Penarikan Berhasil',
+          `${nama} — Rp ${Number(nominal).toLocaleString('id-ID')}`
+        );
+      } else {
+        tab2Toast.error('Transaksi Gagal', response?.message || 'Gagal menyimpan transaksi.');
       }
-    } catch (error) {
+  
+    } catch (error: any) {
       console.error('Submit transaksi error:', error);
+      tab2Toast.error('Terjadi Kesalahan', error?.response?.data?.message || 'Gagal menghubungi server.');
     } finally {
       setIsSubmitting(false);
       setLoading(false);
     }
   }
 
-  const loadDataSiswa = async (idYangDipilih: string) => {
-    try {
-      const responseData = await tab2ApiService.getNonMessage(
-        `${process.env.EXPO_PUBLIC_API_URL}/siswa/siswa-per-kelas?kelasId=${idYangDipilih}`,
-        'siswa'
-      )
-
-      if (responseData && responseData.data) {
-        const siswaAktif = responseData.data.filter((siswa: any) => siswa.isActive !== 0);
-        setListSiswa(siswaAktif || []);
-      }
-
-    } catch (error: any) {
-      const message = error?.data?.message || 'Tidak ada data siswa'
-      console.error('Load siswa error:', error)
-    }
-  }
-
   useEffect(() => {
     const initializeData = async () => {
-      try {
-        const raw = await SecureStore.getItemAsync('user_info')
-        
-        if (raw) {
-          const user = JSON.parse(raw)
-          setKelasId(user.kelas_id) // Tetap set state untuk kebutuhan UI lain jika ada
-          
-          await loadDataSiswa(user.kelas_id)
-        }
-      } catch (error) {
-        console.error('Gagal inisialisasi data:', error)
+      const raw = await SecureStore.getItemAsync('user_info');
+      if (raw) {
+        const user = JSON.parse(raw);
+        await loadDataSiswa(user.kelas_id);
       }
-    }
-  
-    initializeData()
-  }, [])
+    };
+    initializeData();
+  }, []);
 
   useEffect(() => {
     setTipe(defaultTipe || '');
   }, [defaultTipe]);
 
-  const handleSimpan = () => {
-    postTransaksiData()
-  };
-
-  // return (
-  //   <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-  //     <View style={styles.formCard}>
-  //       <Text style={styles.sectionTitle}>Pencatatan Tabungan</Text>
-
-  //       {/* Input NIS */}
-  //       <View style={styles.inputGroup}>
-  //         <Text style={styles.label}>Nomor Induk Siswa (NIS)</Text>
-  //         <View style={styles.inputWrapper}>
-  //           <FontAwesome name="id-card" size={16} color="#64748b" style={styles.icon} />
-  //           <TextInput
-  //             style={styles.input}
-  //             placeholder="Contoh: 202601001"
-  //             keyboardType="number-pad"
-  //             value={nis}
-  //             onChangeText={(val) => {
-  //               setNis(val);
-
-  //               const siswaDitemukan = listSiswa.find((siswa) => siswa.nis === val);
-
-  //               if (siswaDitemukan) {
-  //                 setNama(siswaDitemukan.nama);
-  //               } else {
-  //                 setNama('');
-
-  //                 if (val.length === 7) { 
-  //                   Toast.show({
-  //                     type: 'error',
-  //                     text1: 'Siswa Tidak Ditemukan',
-  //                     text2: 'Siswa bukan dari kelas ini, NIS salah, atau siswa sudah lulus.',
-  //                     position: 'top',
-  //                     visibilityTime: 4000,
-  //                     props: {
-  //                       style: {
-  //                         alignSelf: 'flex-end', // Menggeser komponen ke kanan
-  //                         marginRight: 20,
-  //                         width: '70%', 
-  //                       }
-  //                     }
-  //                   });
-  //                 }
-  //               }
-  //             }}
-  //             editable={!loading}
-  //           />
-  //         </View>
-  //       </View>
-
-  //       {/* Input Nama Siswa */}
-  //       <View style={styles.inputGroup}>
-  //         <Text style={styles.label}>Nama Siswa (Otomatis/Manual)</Text>
-  //         <View style={styles.inputWrapper}>
-  //           <FontAwesome name="user" size={16} color="#64748b" style={styles.icon} />
-  //           <TextInput
-  //             style={styles.input}
-  //             placeholder="Nama akan muncul otomatis"
-  //             value={nama}
-  //             onChangeText={setNama}
-  //             editable={false}
-  //           />
-  //         </View>
-  //       </View>
-
-  //       {/* Pilihan Tipe Transaksi */}
-  //       <Text style={styles.label}>Jenis Transaksi</Text>
-  //       <View style={styles.typeRow}>
-  //         {!(hideOther === 'true' && tipe === 'tarik') && (
-  //           <TouchableOpacity 
-  //             style={[styles.typeButton, tipe === 'setor' && styles.activeSetor]} 
-  //             onPress={() => setTipe('setor')}
-  //           >
-  //             <FontAwesome name="plus-circle" size={18} color={tipe === 'setor' ? '#fff' : '#16a34a'} />
-  //             <Text style={[styles.typeText, tipe === 'setor' && styles.activeTypeText]}>Setor Tunai</Text>
-  //           </TouchableOpacity>
-  //         )}
-
-  //         {!(hideOther === 'true' && tipe === 'setor') && (
-  //             <TouchableOpacity 
-  //               style={[styles.typeButton, tipe === 'tarik' && styles.activeTarik]} 
-  //               onPress={() => setTipe('tarik')}
-  //             >
-  //               <FontAwesome name="minus-circle" size={18} color={tipe === 'tarik' ? '#fff' : '#dc2626'} />
-  //               <Text style={[styles.typeText, tipe === 'tarik' && styles.activeTypeText]}>Tarik Tunai</Text>
-  //             </TouchableOpacity>
-  //           )}
-  //       </View>
-
-  //       {/* Input Nominal */}
-  //       <View style={styles.inputGroup}>
-  //         <Text style={styles.label}>Nominal Transaksi (Rp)</Text>
-  //         <View style={styles.inputWrapper}>
-  //           <Text style={styles.rpText}>Rp</Text>
-  //           <TextInput
-  //             style={styles.input}
-  //             placeholder="Contoh: 50.000"
-  //             keyboardType="number-pad"
-  //             // TAMPILAN: Otomatis diubah ke format bertitik saat dirender
-  //             value={formatInputNominal(nominal)} 
-  //             onChangeText={(val) => {
-  //               // Hapus titik sebelum disimpan ke state agar nilainya tetap angka murni (Contoh: "50000")
-  //               const angkaMurni = val.replace(/\D/g, '');
-  //               setNominal(angkaMurni);
-  //             }}
-  //             editable={!loading}
-  //           />
-  //         </View>
-  //       </View>
-
-  //       {/* Tombol Simpan */}
-  //       <TouchableOpacity style={styles.submitButton} onPress={handleSimpan}>
-  //         <FontAwesome name="save" size={18} color="#fff" />
-  //         <Text style={styles.submitButtonText}>Simpan Transaksi</Text>
-  //       </TouchableOpacity>
-  //     </View>
-
-  //     <AppToast topOffset={20} />
-      
-  //   </ScrollView>
-  // );
+  const handleSimpan = () => postTransaksiData();
 
   return (
     <ScrollView 
       style={styles.container} 
       contentContainerStyle={styles.contentContainer}
-      refreshControl={
-        <RefreshControl 
-          refreshing={refreshing} 
-          onRefresh={onRefresh} 
-          colors={['#2563eb']} // Warna spinner di Android
-          tintColor="#2563eb"  // Warna spinner di iOS
-        />
-      }
-      >
+    >
       <View style={styles.formCard}>
         <Text style={styles.sectionTitle}>Pencatatan Tabungan</Text>
   
-        {/* 💡 2. DROPDOWN NAMA SISWA (BISA DICARI) */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Pilih Nama Siswa</Text>
           <View style={styles.inputWrapperDropdown}>
@@ -276,40 +135,35 @@ export default function TransaksiScreen() {
               placeholderStyle={styles.placeholderStyle}
               selectedTextStyle={styles.selectedTextStyle}
               inputSearchStyle={styles.inputSearchStyle}
-              data={listSiswa} // Data array siswa Anda
+              data={listSiswa}
               search
               maxHeight={300}
-              labelField="nama"
+              labelField="nama_siswa" // Sesuai field database/API
               valueField="nis" 
               placeholder="Cari atau pilih nama siswa..."
               searchPlaceholder="Ketik nama siswa..."
               value={nis}
-              disable={loading}
               onChange={(item: any) => {
                 setNis(item.nis);
-                setNama(item.nama);
+                setNama(item.nama_siswa);
               }}
-              containerStyle={styles.dropdownContainer}
-              renderLeftIcon={() => null} 
             />
           </View>
         </View>
   
-        {/* 💡 3. INPUT NIS (SEKARANG MENJADI OTOMATIS & READ-ONLY) */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Nomor Induk Siswa (NIS)</Text>
           <View style={styles.inputWrapper}>
             <FontAwesome name="id-card" size={16} color="#64748b" style={styles.icon} />
             <TextInput
-              style={[styles.input, { color: '#64748b' }]} // Beri warna teks agak redup karena dibekukan
-              placeholder="Akan terisi otomatis"
+              style={[styles.input, { color: '#64748b' }]}
               value={nis}
-              editable={false} // 💡 Dikunci agar tidak bisa diedit manual
+              editable={false}
+              placeholder="Otomatis..."
             />
           </View>
         </View>
   
-        {/* Pilihan Tipe Transaksi */}
         <Text style={styles.label}>Jenis Transaksi</Text>
         <View style={styles.typeRow}>
           {!(hideOther === 'true' && tipe === 'tarik') && (
@@ -321,19 +175,18 @@ export default function TransaksiScreen() {
               <Text style={[styles.typeText, tipe === 'setor' && styles.activeTypeText]}>Setor Tunai</Text>
             </TouchableOpacity>
           )}
-  
+
           {!(hideOther === 'true' && tipe === 'setor') && (
-            <TouchableOpacity 
-              style={[styles.typeButton, tipe === 'tarik' && styles.activeTarik]} 
-              onPress={() => setTipe('tarik')}
-            >
-              <FontAwesome name="minus-circle" size={18} color={tipe === 'tarik' ? '#fff' : '#dc2626'} />
-              <Text style={[styles.typeText, tipe === 'tarik' && styles.activeTypeText]}>Tarik Tunai</Text>
-            </TouchableOpacity>
-          )}
+              <TouchableOpacity 
+                style={[styles.typeButton, tipe === 'tarik' && styles.activeTarik]} 
+                onPress={() => setTipe('tarik')}
+              >
+                <FontAwesome name="minus-circle" size={18} color={tipe === 'tarik' ? '#fff' : '#dc2626'} />
+                <Text style={[styles.typeText, tipe === 'tarik' && styles.activeTypeText]}>Tarik Tunai</Text>
+              </TouchableOpacity>
+            )}
         </View>
   
-        {/* Input Nominal */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Nominal Transaksi (Rp)</Text>
           <View style={styles.inputWrapper}>
@@ -343,34 +196,25 @@ export default function TransaksiScreen() {
               placeholder="Contoh: 50.000"
               keyboardType="number-pad"
               value={formatInputNominal(nominal)} 
-              onChangeText={(val) => {
-                const angkaMurni = val.replace(/\D/g, '');
-                setNominal(angkaMurni);
-              }}
-              editable={!loading}
+              onChangeText={(val) => setNominal(val.replace(/\D/g, ''))}
             />
           </View>
         </View>
   
-        {/* Tombol Simpan */}
         <TouchableOpacity style={styles.submitButton} onPress={handleSimpan} disabled={isSubmitting}>
-          <Text style={styles.submitButtonText}>
-            {isSubmitting ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="small" color="#ffffff" />
-                  <Text style={styles.submitButtonText}>Loading...</Text>
-                </View>
-              ) : (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                  <FontAwesome name="save" size={18} color="#fff" />
-                  <Text style={styles.submitButtonText}>Simpan Transaksi</Text>
-                </View>
-              )}
-          </Text>
+          {isSubmitting ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <ActivityIndicator color="#fff" size="small" />
+              <Text style={styles.submitButtonText}>Menyimpan Transaksi...</Text>
+            </View>
+          ) : (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <FontAwesome name="save" size={18} color="#fff" />
+              <Text style={styles.submitButtonText}>Simpan Transaksi</Text>
+            </View>
+          )}
         </TouchableOpacity>
-      </View>
-  
-      <AppToast topOffset={5} />
+      </View>  
     </ScrollView>
   );
 }
@@ -400,7 +244,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#cbd5e1',
     borderRadius: 10,
-    paddingLeft: 12, // Hanya padding kiri untuk menata icon
+    paddingLeft: 12,
     backgroundColor: '#f8fafc',
     height: 46,
   },
@@ -425,20 +269,5 @@ const styles = StyleSheet.create({
     fontSize: 15,
     borderRadius: 8,
     color: '#1e293b',
-  },
-  loadingContainer: {
-    flexDirection: 'row',     
-    alignItems: 'center',    
-    justifyContent: 'center',  
-    gap: 12,                    
-  },
-  dropdownContainer: {
-    borderRadius: 8,         
-    marginTop: 4,            
-    elevation: 3,            
-    shadowColor: '#000',     
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
   },
 });
