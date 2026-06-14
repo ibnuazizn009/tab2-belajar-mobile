@@ -148,9 +148,7 @@ export default function RegisterView({ onSwitchToLogin, styles }: RegisterViewPr
         payload,
         'auth'
       );
-      
-      console.log(responseData);
-  
+        
       if (responseData && responseData.success) {
         Alert.alert(
           'Sukses', 

@@ -53,7 +53,7 @@ export default function DetailTransaksiScreen() {
     if (!isAllowedToDownload) {
       Alert.alert(
         '🔒 Fitur Premium Terkunci',
-        'Fitur cetak cetak PDF riwayat detail transaksi ini hanya tersedia pada paket Golden All Akses. Silakan hubungi manajemen atau Admin Utama sekolah untuk upgrade layanan!'
+        'Fitur cetak PDF riwayat detail transaksi ini hanya tersedia pada paket Golden All Akses. Silakan hubungi manajemen atau Admin Utama sekolah untuk upgrade layanan!'
       );
       return;
     }
@@ -112,7 +112,7 @@ export default function DetailTransaksiScreen() {
         >
           <FontAwesome name={isGoldenTier ? "file-pdf-o" : "lock"} size={15} color="#fff" />
           <Text style={styles.exportText}>
-            {isExporting ? 'Mengexport...' : isGoldenTier ? 'Export PDF Transaksi' : 'PDF (Hanya Paket Golden)'}
+            {isExporting ? 'Mengexport...' : isGoldenTier ? 'Export PDF Transaksi' : 'PDF (Golden Only)'}
           </Text>
         </TouchableOpacity>
 

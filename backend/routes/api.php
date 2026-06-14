@@ -6,6 +6,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\MasterController;
 use App\Http\Controllers\siswa\SiswaController;
 use App\Http\Controllers\siswa\TransaksiController;
+use App\Http\Controllers\Api\AdminSekolahController;
 use App\Http\Controllers\SuperAdminController;
 
 /*
@@ -43,9 +44,23 @@ Route::middleware('auth:api')->group(function () use ($prefix) {
     Route::post("$prefix/siswa/tambah-siswa",  [SiswaController::class, 'postTambahSiswa']);
     Route::get("$prefix/siswa/laporan-transaksi-siswa",  [SiswaController::class, 'getLaporanTransaksiSiswa']);
     Route::get("$prefix/siswa/laporan-keuangan-siswa", [SiswaController::class, 'getLaporanKeuanganSiswa']);
+    Route::get("$prefix/siswa/template", [SiswaController::class, 'downloadTemplate']);
+    Route::post("$prefix/siswa/import-excel", [SiswaController::class, 'importExcel']);
 
-    // Transaksi Inti (Setor, Tarik, & Riwayat Mutasi)
     Route::post("$prefix/transaksi/transaksi",  [TransaksiController::class, 'postTransaksiSiswa']);
     Route::get("$prefix/transaksi/riwayat-transaksi",  [TransaksiController::class, 'getRiwayatTransaksiSiswa']);
+
+    Route::middleware('role:ADMIN_SEKOLAH')->group(function () use ($prefix) {
+        
+        Route::get("$prefix/admin/dashboard", [AdminSekolahController::class, 'getDashboardData']);
+        
+        Route::post("$prefix/admin/guru", [AdminSekolahController::class, 'tambahGuru']);
+        Route::post("$prefix/admin/guru/reset-password", [AdminSekolahController::class, 'resetPasswordGuru']);
+        
+        Route::post("$prefix/admin/update-foto", [AdminSekolahController::class, 'updateFotoProfil']);
+        Route::post("$prefix/admin/update-password", [AdminSekolahController::class, 'updatePasswordSelf']);
+        
+        Route::post("$prefix/siswa/import-excel", [SiswaController::class, 'importExcel']);
+    });
 
 });

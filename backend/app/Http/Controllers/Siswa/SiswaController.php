@@ -1,15 +1,18 @@
 <?php
 
-namespace App\Http\Controllers\siswa;
+namespace App\Http\Controllers\Siswa;
 
 use App\Http\Controllers\Controller;
 use App\Models\Kelas;
-use App\Models\Siswa; 
+use App\Models\Siswa;
+use App\Imports\SiswaImport; 
+use App\Exports\TemplateSiswaExport;
 use App\Models\Transaksi;
 use App\Helpers\LicenseChecker;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Facades\Auth;
 
 class SiswaController extends Controller
@@ -277,6 +280,55 @@ class SiswaController extends Controller
                 'success' => false,
                 'message' => 'Terjadi kesalahan pada server saat memuat data.',
                 'error'   => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function downloadTemplate()
+    {
+        return Excel::download(new TemplateSiswaExport, 'Template_Siswa.xlsx');
+    }
+
+    public function importExcel(Request $request)
+    {
+        $sekolahId = Auth::user()->sekolah_id;
+        $sekolah = \App\Models\Sekolah::find($sekolahId);
+
+        // Validasi paket layanan
+        if ($sekolah->paket_layanan !== 'golden') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Fitur ini hanya tersedia untuk paket Golden.'
+            ], 403);
+        }
+
+        $request->validate([
+            'file' => 'required|mimes:xlsx,xls|max:2048'
+        ]);
+
+        try {
+            Excel::import(new SiswaImport($sekolahId), $request->file('file'));
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Import berhasil!'
+            ]);
+
+        } catch (\Maatwebsite\Excel\Validators\ValidationException $e) {
+            $failures = collect($e->failures())->map(function($f) {
+                return "Baris {$f->row()}: " . implode(', ', $f->errors());
+            });
+        
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal import: data tidak valid.',
+                'errors'  => $failures
+            ], 422);
+        
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal import: ' . $e->getMessage()
             ], 500);
         }
     }

@@ -1,6 +1,7 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
+import { File, Paths } from 'expo-file-system/next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform, Alert } from 'react-native';
 
@@ -287,4 +288,65 @@ const generateAndSaveToDocuments = async (html: string, filename: string) => {
       Alert.alert('Error', error?.message ?? 'Gagal menyimpan PDF');
     }
 };
+
+export const downloadAndSaveToDocuments = async (
+  url: string,
+  filename: string,
+  mimeType: string,
+  headers?: Record<string, string>
+) => {
+  try {
+    const file = new File(Paths.cache, filename);
+    if (file.exists) {
+      file.delete();
+    }
+    await File.downloadFileAsync(url, file, { headers });
+
+    if (Platform.OS === 'android') {
+      let directoryUri = await AsyncStorage.getItem(STORAGE_KEY);
+
+      if (!directoryUri) {
+        const permissions =
+          await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+
+        if (!permissions.granted) {
+          Alert.alert('Info', 'Izin folder ditolak.');
+          return;
+        }
+
+        directoryUri = permissions.directoryUri;
+        await AsyncStorage.setItem(STORAGE_KEY, directoryUri);
+      }
+
+      const destUri = await FileSystem.StorageAccessFramework.createFileAsync(
+        directoryUri,
+        filename,
+        mimeType
+      );
+
+      const base64Data = await FileSystem.readAsStringAsync(file.uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      await FileSystem.StorageAccessFramework.writeAsStringAsync(
+        destUri,
+        base64Data,
+        { encoding: FileSystem.EncodingType.Base64 }
+      );
+
+      Alert.alert('Berhasil', `File tersimpan di folder pilihan Anda.`);
+
+    } else {
+      // iOS: share sheet
+      await Sharing.shareAsync(file.uri, {
+        mimeType,
+        UTI: 'com.microsoft.excel.xlsx',
+      });
+    }
+  } catch (error: any) {
+    console.error(error);
+    Alert.alert('Error', error?.message ?? 'Gagal menyimpan file');
+  }
+};
+
   

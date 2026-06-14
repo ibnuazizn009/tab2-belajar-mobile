@@ -4,6 +4,7 @@
  */
 
 import * as SecureStore from 'expo-secure-store'
+import axios from 'axios';
 import { jwtDecode } from 'jwt-decode'
 import Toast from 'react-native-toast-message'
 
@@ -325,5 +326,21 @@ export const tab2ApiService = {
       showSnackbarNonMessage('error')
       throw error
     }
-  }
+  },
+
+  postMultipart: async (url: string, formData: FormData) => {
+    try {
+      const token = await SecureStore.getItemAsync('token');
+      const response = await axios.post(url, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error postMultipart:', error);
+      throw error;
+    }
+  },
 }

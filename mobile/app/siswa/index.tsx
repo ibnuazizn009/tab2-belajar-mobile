@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import * as SecureStore from 'expo-secure-store';
-import { ScrollView, StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, RefreshControl } from 'react-native';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
+import { File, Paths } from 'expo-file-system/next';
+import * as Sharing from 'expo-sharing';
+import { ScrollView, StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, RefreshControl, Linking } from 'react-native';
 import Modal from 'react-native-modal';
 import { Stack } from 'expo-router';
 import { FontAwesome } from '@expo/vector-icons';
@@ -9,6 +13,7 @@ import { SkeletonBox } from '../../components/SkeletonLoader';
 import { exportSiswaListPdf } from '../../utils/exportPdf';
 import { CHECK_FEATURE } from '@/constants/Features'; // 🎯 1. Import helper fitur bisnis
 import { tab2Toast } from '@/utils/tab2Toast';
+import { downloadAndSaveToDocuments } from '@/utils/exportPdf';
 
 export default function SiswaScreen() {
   const [refreshing, setRefreshing] = useState(false);
@@ -70,7 +75,6 @@ export default function SiswaScreen() {
         const raw = await SecureStore.getItemAsync('user_info');
         if (raw) {
           const user = JSON.parse(raw);    
-          console.log(user.kelas_id);   
           setUserInfo(user); // 🎯 Simpan ke state agar bisa dibaca paket_layanannya
           await loadDataSiswa(user.kelas_id);
           setKelasId(user.kelas_id);
@@ -83,14 +87,13 @@ export default function SiswaScreen() {
     initializeData();
   }, []);
 
-  // 🎯 3. Intersepsi Fitur Export Berdasarkan Hak Akses Paket
   const handleExport = async () => {
     const canDownload = CHECK_FEATURE(userInfo?.paket_layanan, 'DOWNLOAD_REPORT');
     
     if (!canDownload) {
       Alert.alert(
         '🔒 Fitur Terkunci',
-        'Fitur cetak cetak PDF / Excel massal hanya tersedia pada paket Golden All Akses. Silakan hubungi Admin Utama untuk upgrade paket sekolah Anda.'
+        'Fitur cetak PDF hanya tersedia pada paket Golden All Akses. Silakan hubungi Admin Utama untuk upgrade paket sekolah Anda.'
       );
       return;
     }
@@ -151,6 +154,57 @@ export default function SiswaScreen() {
     }
   };
   
+  const handleDownloadTemplate = async () => {
+    const token = await SecureStore.getItemAsync('access_token');
+  
+    tab2Toast.info('Mengunduh', 'Sedang menyiapkan template...');
+  
+    await downloadAndSaveToDocuments(
+      `${process.env.EXPO_PUBLIC_API_URL}/siswa/template`,
+      'Template_Siswa.xlsx',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      { 'Authorization': `Bearer ${token}` }
+    );
+  };
+  
+
+  const handleImportExcel = async () => 
+  {
+    // Cek fitur hanya untuk paket Golden
+    const canImport = CHECK_FEATURE(userInfo?.paket_layanan, 'IMPORT_EXCEL');
+    
+    if (!canImport) {
+      Alert.alert(
+        '🔒 Fitur Terkunci',
+        'Fitur Import Excel hanya tersedia pada paket Golden All Akses. Silakan hubungi Admin Utama untuk upgrade paket sekolah Anda.'
+      );
+      return;
+    }
+
+    try {
+      const result = await DocumentPicker.getDocumentAsync({ type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      
+      if (!result.canceled) {
+        const file = result.assets[0];
+        const formData = new FormData();
+        formData.append('file', { uri: file.uri, name: file.name, type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' } as any);
+        formData.append('kelas_id', kelasId);
+
+        const response = await tab2ApiService.postMultipart(
+          `${process.env.EXPO_PUBLIC_API_URL}/siswa/import-excel`,
+          formData
+        );
+
+        if (response?.success) {
+          tab2Toast.success('Berhasil', 'Data siswa berhasil diimport.');
+          await loadDataSiswa(kelasId);
+        }
+      }
+    } catch (e) {
+      tab2Toast.error('Gagal', 'Terjadi kesalahan saat import.');
+    }
+  };
+
   useEffect(() => {
     if (!errorMessage) return;
     
@@ -197,30 +251,59 @@ export default function SiswaScreen() {
         </View>
   
         {/* Baris Tombol Aksi */}
-        <View style={styles.actionRow}>
-          {/* 🎯 4. Tombol PDF Berubah Tampilan Mengikuti Level Paket */}
-          <TouchableOpacity
-            style={[
-              styles.actionButton, 
-              styles.exportButton, 
-              !isGoldenTier && { backgroundColor: '#94a3b8' } // Berubah abu-abu jika terkunci
-            ]}
-            onPress={handleExport}
-            disabled={isExporting || dataSiswa.length === 0}
-          >
-            <FontAwesome name={isGoldenTier ? "file-pdf-o" : "lock"} size={14} color="#fff" />
-            <Text style={styles.buttonText}>
-              {isExporting ? 'Mengexport...' : isGoldenTier ? 'Export PDF' : 'PDF (Golden Only)'}
-            </Text>
-          </TouchableOpacity>
+        <View style={styles.actionContainer}>
   
-          <TouchableOpacity
-            style={[styles.actionButton, styles.addButton]}
-            onPress={() => setModalVisible(true)}
-          >
-            <FontAwesome name="user-plus" size={14} color="#fff" />
-            <Text style={styles.buttonText}>Tambah Siswa</Text>
-          </TouchableOpacity>
+          {/* Baris 1: Export & Tambah (Horizontal) */}
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              style={[
+                styles.actionButton, 
+                styles.exportButton, 
+                !isGoldenTier && { backgroundColor: '#94a3b8' }
+              ]}
+              onPress={handleExport}
+              disabled={isExporting || dataSiswa.length === 0}
+            >
+              <FontAwesome name={isGoldenTier ? "file-pdf-o" : "lock"} size={14} color="#fff" />
+              <Text style={styles.buttonText}>
+                {isExporting ? 'Mengexport...' : isGoldenTier ? 'Export PDF' : 'PDF (Golden Only)'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.actionButton, styles.addButton]}
+              onPress={() => setModalVisible(true)}
+            >
+              <FontAwesome name="user-plus" size={14} color="#fff" />
+              <Text style={styles.buttonText}>Tambah Siswa</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Baris 2: Download Template & Import (Vertikal/Bawahnya) */}
+          <View style={styles.importSection}>
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.templateButton]} 
+              onPress={handleDownloadTemplate}
+            >
+              <FontAwesome name="download" size={14} color="#fff" />
+              <Text style={styles.buttonText}>Download Template</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.actionButton, 
+                styles.importButton,
+                !isGoldenTier && { backgroundColor: '#94a3b8' }
+              ]}
+              onPress={handleImportExcel}
+            >
+              <FontAwesome name={isGoldenTier ? "file-excel-o" : "lock"} size={14} color="#fff" />
+              <Text style={styles.buttonText}>
+                {isGoldenTier ? 'Import Excel' : 'Import (Golden Only)'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
         </View>
   
         {/* List Daftar Siswa */}
@@ -446,5 +529,18 @@ const styles = StyleSheet.create({
     fontSize: 12, 
     fontWeight: '500', 
     flex: 1 
-  }
+  },
+  actionContainer: {
+    gap: 10, // Memberi jarak antara baris atas dan bawah
+    marginVertical: 10,
+  },
+  importSection: { flexDirection: 'row', paddingHorizontal: 8, gap: 10 },
+  templateButton: {
+    backgroundColor: '#3b82f6', // Biru untuk template
+    flex: 1,
+  },
+  importButton: {
+    backgroundColor: '#10b981', // Hijau untuk import
+    flex: 1,
+  },
 });
