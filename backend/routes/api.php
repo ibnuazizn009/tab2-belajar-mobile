@@ -4,8 +4,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\MasterController;
-use App\Http\Controllers\siswa\SiswaController;
-use App\Http\Controllers\siswa\TransaksiController;
+use App\Http\Controllers\Siswa\SiswaController;
+use App\Http\Controllers\Siswa\TransaksiController;
 use App\Http\Controllers\Api\AdminSekolahController;
 use App\Http\Controllers\SuperAdminController;
 
