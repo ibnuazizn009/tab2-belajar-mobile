@@ -71,7 +71,7 @@ export default function LoginView({
   };
 
   const openWebsiteDaftar = () => {
-    Linking.openURL('https://e-tabungan-anda.com/register').catch((err) => 
+    Linking.openURL('http://etabungan-tab2one.hopto.org/').catch((err) => 
       console.error("Gagal membuka URL", err)
     );
   };
