@@ -27,7 +27,7 @@ Route::get("$prefix/master/kota", [MasterController::class, 'getAllKota']);
 Route::get("$prefix/master/sekolah-by-kota", [MasterController::class, 'getSekolahByKota']);
 
 // Menggunakan standar middleware Tymon/JWTAuth yaitu 'auth:api'
-Route::middleware('auth:api')->group(function () use ($prefix) {
+Route::middleware(['jwt.cookie'])->group(function () use ($prefix) {
     
     // Auth Kelola Session
     Route::post("$prefix/auth/logout",  [AuthController::class, 'logout']);
@@ -50,11 +50,14 @@ Route::middleware('auth:api')->group(function () use ($prefix) {
     Route::post("$prefix/transaksi/transaksi",  [TransaksiController::class, 'postTransaksiSiswa']);
     Route::get("$prefix/transaksi/riwayat-transaksi",  [TransaksiController::class, 'getRiwayatTransaksiSiswa']);
 
-    Route::middleware('role:ADMIN_SEKOLAH')->group(function () use ($prefix) {
+    Route::middleware('role:admin_sekolah')->group(function () use ($prefix) {
         
         Route::get("$prefix/admin/dashboard", [AdminSekolahController::class, 'getDashboardData']);
         
-        Route::post("$prefix/admin/guru", [AdminSekolahController::class, 'tambahGuru']);
+        Route::post("$prefix/admin/data-guru", [AdminSekolahController::class, 'tambahDataGuru']);
+        Route::get("$prefix/admin/data-guru-list", [AdminSekolahController::class, 'getDataGuru']);
+        Route::post("$prefix/admin/akun-guru", [AdminSekolahController::class, 'tambahDataAkunGuru']);
+        Route::get("$prefix/admin/akun-guru-list", [AdminSekolahController::class, 'getDataAkunGuru']);
         Route::post("$prefix/admin/guru/reset-password", [AdminSekolahController::class, 'resetPasswordGuru']);
         
         Route::post("$prefix/admin/update-foto", [AdminSekolahController::class, 'updateFotoProfil']);

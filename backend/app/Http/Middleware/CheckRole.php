@@ -10,15 +10,28 @@ class CheckRole
 {
     public function handle(Request $request, Closure $next, ...$roles)
     {
-        $user = Auth::user();
+        $user = Auth::guard('api')->user();
 
-        if ($user && in_array($user->role, $roles)) {
+        if (!$user) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Unauthenticated.',
+            ], 401);
+        }
+
+        // Cocokkan case-insensitive, supaya tidak gagal karena
+        // perbedaan kapitalisasi antara route ('ADMIN_SEKOLAH')
+        // dan nilai asli di database ('admin_sekolah')
+        $userRole     = strtolower($user->role);
+        $allowedRoles = array_map('strtolower', $roles);
+
+        if (in_array($userRole, $allowedRoles)) {
             return $next($request);
         }
 
         // Jika token valid tapi rolenya salah (Misal: Guru mencoba akses rute Admin)
         return response()->json([
-            'status' => 'error',
+            'status'  => 'error',
             'message' => 'Akses ditolak. Anda tidak memiliki otoritas untuk fitur ini.'
         ], 403);
     }

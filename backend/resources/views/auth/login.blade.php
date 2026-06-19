@@ -77,20 +77,24 @@
                         <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                             <i class="fa-solid fa-lock text-sm"></i>
                         </div>
+                        
                         <input type="password" id="password" name="password" required
-                            class="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition duration-200 text-sm shadow-sm"
+                            class="w-full pl-10 pr-10 py-3 bg-white border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition duration-200 text-sm shadow-sm"
                             placeholder="••••••••">
+                            
+                        <button type="button" id="toggle-password" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition cursor-pointer">
+                            <i class="fa-solid fa-eye text-sm" id="eye-icon"></i>
+                        </button>
                     </div>
                 </div>
 
                 <div class="flex items-center">
                     <input type="checkbox" id="remember_me" name="remember" 
-                        class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500/20 transition duration-150">
-                    <label for="remember_me" class="ml-2 text-xs font-medium text-slate-600 select-none">Ingat perangkat ini</label>
+                        class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500/20 transition duration-150 cursor-pointer">
+                    <label for="remember_me" class="ml-2 text-xs font-medium text-slate-600 select-none cursor-pointer">Ingat perangkat ini</label>
                 </div>
 
                 <!-- Tombol Submit Masuk -->
-                @csrf
                 <button type="submit" id="btn-login" class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl transition duration-200 shadow-lg shadow-blue-600/20 tracking-wide flex items-center justify-center gap-2 transform active:scale-[0.98]">
                     <span id="btn-text">Masuk ke Akun</span>
                     <i id="btn-icon" class="fa-solid fa-right-to-bracket text-xs opacity-80"></i>
@@ -101,7 +105,7 @@
             <div class="mt-8 pt-6 border-t border-slate-100 text-center">
                 <p class="text-xs text-slate-500">
                     Sekolah belum terdaftar? 
-                    <a href="{{ route('register') }}" class="font-bold text-blue-600 hover:underline ml-1">Mulai Ekosistem Digital</a>
+                    <a href="{{ route('register') }}" class="font-bold text-blue-600 hover:underline ml-1">Daftar Sekarang</a>
                 </p>
             </div>
 
@@ -119,6 +123,29 @@
         const btnText = document.getElementById('btn-text');
         const btnIcon = document.getElementById('btn-icon');
 
+        const passwordInput = document.getElementById('password');
+        const togglePasswordBtn = document.getElementById('toggle-password');
+        const eyeIcon = document.getElementById('eye-icon');
+        const usernameInput = document.getElementById('username');
+        const rememberMeCheckbox = document.getElementById('remember_me');
+
+        // 1. Logika Toggle Lihat/Sembunyikan Password
+        togglePasswordBtn.addEventListener('click', function() {
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                eyeIcon.className = 'fa-solid fa-eye-slash text-sm';
+            } else {
+                passwordInput.type = 'password';
+                eyeIcon.className = 'fa-solid fa-eye text-sm';
+            }
+        });
+
+        // 2. Logika Cek Jalannya "Ingat Perangkat Ini" Saat Halaman Dimuat
+        if (localStorage.getItem('remembered_username')) {
+            usernameInput.value = localStorage.getItem('remembered_username');
+            rememberMeCheckbox.checked = true;
+        }
+
         form.addEventListener('submit', function(e) {
             e.preventDefault();
             
@@ -130,15 +157,22 @@
             fetch(form.action, {
                 method: 'POST',
                 body: new FormData(form),
-                headers: { 'Accept': 'application/json' }
+                headers: { 'Accept': 'application/json' },
+                credentials: 'include'
             })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
+                    if (rememberMeCheckbox.checked) {
+                        localStorage.setItem('remembered_username', usernameInput.value);
+                    } else {
+                        localStorage.removeItem('remembered_username');
+                    }
                     // Simpan Token
-                    localStorage.setItem('token_jwt', data.access_token);
                     localStorage.setItem('nama_sekolah', data.user.nama_sekolah);
                     localStorage.setItem('paket_layanan', data.user.paket_layanan);
+                    localStorage.setItem('sekolah_id', data.user.sekolah_id);
+                    localStorage.setItem('sisa_hari_paket', data.user.sisa_hari_paket);
 
                     Swal.fire({
                         icon: 'success', 
@@ -156,14 +190,14 @@
                     setTimeout(() => { window.location.href = "/dashboard-admin"; }, 1500);
                 } else {
                     Swal.fire({
-                        icon: 'success', 
+                        icon: 'error', 
                         title: 'Login Gagal!',
                         text: data.message || 'Username atau password salah',
-                        width: '85%',         
-                        showConfirmButton: false,
+                        showConfirmButton: true,
                         width: 'auto',             
                         padding: '1em',    
                         confirmButtonText: 'Tutup',
+                        confirmButtonColor: '#ef4444',
                         customClass: {
                             popup: 'max-w-[400px] w-[90%] text-sm' 
                         }
@@ -177,10 +211,11 @@
                     title: 'Login Gagal!',
                     text: 'Gagal menghubungi server',
                     width: '85%',         
-                    showConfirmButton: false,
+                    showConfirmButton: true,
                     width: 'auto',              
                     padding: '1em',    
                     confirmButtonText: 'Tutup',
+                    confirmButtonColor: '#ef4444',
                     customClass: {
                         popup: 'max-w-[400px] w-[90%] text-sm' 
                     }

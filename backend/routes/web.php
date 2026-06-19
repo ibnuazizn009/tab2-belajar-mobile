@@ -23,7 +23,10 @@ Route::get('/dashboard-admin', function () {
     return view('dashboard-admin');
 })->name('dashboard-admin');
 
-Route::get('/guru', function () { return view('guru'); });
+Route::get('/akun-guru', function () { return view('akun-guru'); });
+Route::get('/data-guru', function () { return view('data-guru'); });
+
+Route::get('/kelas', function () { return view('kelas'); });
 Route::get('/transaksi', function () { return view('transaksi'); });
 Route::get('/pengaturan', function () { return view('pengaturan'); });
 
@@ -33,3 +36,7 @@ Route::get('/login', function () {
 
 Route::get('/register', [SuperAdminController::class, 'showRegisterForm'])->name('register');
 Route::post('/register', [SuperAdminController::class, 'registerSekolahBaru'])->name('register.proses');
+
+Route::get('/test-no-auth', function () {
+    return 'Halaman ini berhasil diakses tanpa redirect';
+});

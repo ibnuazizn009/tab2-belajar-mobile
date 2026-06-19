@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
 use App\Models\LoginUser;
 use App\Models\Kelas;
+use App\Models\DataGuru;
 
 class AdminSekolahController extends Controller
 {
@@ -49,15 +50,17 @@ class AdminSekolahController extends Controller
     /**
      * 2. Tambah Akun Guru Berdasarkan Tier Paket Layanan
      */
-    public function tambahGuru(Request $request)
+    public function tambahDataGuru(Request $request)
     {
         /** @var \App\Models\LoginUser $admin */
         $admin = auth('api')->user();
 
+        // 1. VALIDASI INPUT SESUAI STRUKTUR DATA GURU (PROFIL)
         $validator = Validator::make($request->all(), [
-            'nama_lengkap' => 'required|string|max:255',
-            'username'     => 'required|string|min:4|unique:login_users,username', // Sesuaikan nama tabel asli login_user Anda
-            'password'     => 'required|string|min:6',
+            'nama_guru'     => 'required|string|max:255',
+            'nip'           => 'nullable|string|max:50|unique:data_gurus,nip', // Unik di tabel data_gurus
+            'jenis_kelamin' => 'nullable|in:L,P',
+            'no_hp'         => 'nullable|string|max:20',
         ]);
 
         if ($validator->fails()) {
@@ -68,40 +71,62 @@ class AdminSekolahController extends Controller
             ], 422);
         }
 
-        // --- VALIDASI PEMBATASAN KUOTA BERDASARKAN PAKET LAYANAN ---
-        // Anda bisa memuat relasi sekolah si admin untuk dicek paketnya
         $sekolah = $admin->sekolah;
-        $jumlahGuruSekarang = LoginUser::where('sekolah_id', $admin->sekolah_id)->where('role', 'guru')->count();
+        
+        $jumlahGuruSekarang = DataGuru::where('sekolah_id', $admin->sekolah_id)->count();
 
         if ($sekolah) {
-            // Contoh limitasi: paket free maks 1 guru, middle maks 5 guru, golden/premium unlimited
+            // Pengecekan limitasi paket layanan sekolah
             if ($sekolah->paket_layanan === 'free' && $jumlahGuruSekarang >= 1) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Batas limit akun Guru untuk Paket Free telah penuh (Maksimal 1 Guru). Silakan upgrade paket layanan sekolah Anda.'
+                    'message' => 'Batas limit data Guru untuk Paket Free telah penuh (Maksimal 1 Guru). Silakan upgrade paket layanan sekolah Anda.'
                 ], 403);
             } 
             
             if ($sekolah->paket_layanan === 'middle' && $jumlahGuruSekarang >= 5) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Batas limit akun Guru untuk Paket Middle telah penuh (Maksimal 5 Guru).'
+                    'message' => 'Batas limit data Guru untuk Paket Middle telah penuh (Maksimal 5 Guru).'
                 ], 403);
             }
         }
 
-        $guru = LoginUser::create([
-            'sekolah_id'   => $admin->sekolah_id,
-            'nama_lengkap' => $request->nama_lengkap,
-            'username'     => strtolower(trim($request->username)),
-            'password'     => Hash::make($request->password),
-            'role'         => 'guru',
+        $guru = DataGuru::create([
+            'sekolah_id'    => $admin->sekolah_id, // Otomatis mengikat ke ID sekolah milik admin
+            'nip'           => $request->nip,
+            'nama_guru'     => $request->nama_guru,
+            'jenis_kelamin' => $request->jenis_kelamin,
+            'no_hp'         => $request->no_hp,
         ]);
 
         return response()->json([
             'success' => true,
-            'message' => 'Akun Guru atas nama ' . $guru->nama_lengkap . ' berhasil didaftarkan.'
+            'message' => 'Data Guru atas nama ' . $guru->nama_guru . ' berhasil disimpan.'
         ], 201);
+    }
+
+    public function getDataGuru()
+    {
+        /** @var \App\Models\LoginUser $admin */
+        $admin = auth('api')->user();
+
+        if (!$admin) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Sesi Anda telah berakhir. Silakan login kembali.'
+            ], 401);
+        }
+
+        $dataGuru = DataGuru::where('sekolah_id', $admin->sekolah_id)
+                            ->latest()
+                            ->get();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Berhasil memuat daftar data guru.',
+            'data'    => $dataGuru
+        ], 200);
     }
 
     /**
@@ -109,32 +134,54 @@ class AdminSekolahController extends Controller
      */
     public function resetPasswordGuru(Request $request)
     {
-        /** @var \App\Models\LoginUser $admin */
-        $admin = auth('api')->user();
-
-        $request->validate([
-            'username_guru' => 'required|string',
+        // Validasi input
+        $validator = Validator::make($request->all(), [
+            'username' => 'required|string|exists:login_users,username',
+            'password' => 'required|string|min:4',
+        ], [
+            'username.exists' => 'Username tidak terdaftar di sistem.',
+            'password.min'    => 'Password minimal harus 4 karakter.',
         ]);
 
-        $guru = LoginUser::where('username', $request->username_guru)
-                         ->where('sekolah_id', $admin->sekolah_id)
-                         ->where('role', 'guru')
-                         ->first();
-
-        if (!$guru) {
+        if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Akun Guru tidak ditemukan di bawah naungan sekolah Anda.'
-            ], 404);
+                'message' => $validator->errors()->first()
+            ], 422);
         }
 
-        $guru->password = Hash::make('123456');
-        $guru->save();
+        try {
+            // Ambil sekolah_id admin yang login untuk validasi keamanan tambahan
+            $sekolahId = auth()->user()->sekolah_id ?? null;
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Password guru ' . $guru->nama_lengkap . ' berhasil di-reset menjadi standar: 123456'
-        ], 200);
+            // Cari guru spesifik berdasarkan username & sekolah_id milik admin ini saja
+            $guru = LoginUser::where('username', $request->username)
+                ->where('sekolah_id', $sekolahId)
+                ->where('role', 'guru')
+                ->first();
+
+            if (!$guru) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Akun guru tidak ditemukan atau Anda tidak memiliki hak akses.'
+                ], 404);
+            }
+
+            // Update password (disimpan plain text sesuai kebutuhan struktur tabel Anda)
+            $guru->password = $request->password;
+            $guru->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Password berhasil diperbarui.'
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mereset password: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
@@ -214,5 +261,102 @@ class AdminSekolahController extends Controller
             'success' => false,
             'message' => 'Gagal mengunggah gambar.'
         ], 400);
+    }
+
+    public function getDataAkunGuru(Request $request)
+    {
+        try {
+            $sekolahId = auth()->user()->sekolah_id ?? null;
+
+            if (!$sekolahId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Sesi tidak valid atau sekolah tidak ditemukan.'
+                ], 401);
+            }
+
+            $guru = LoginUser::where('sekolah_id', $sekolahId)
+                ->where('role', 'guru')
+                ->select('nama_lengkap', 'username', 'password') // Mengambil password untuk fitur lihat password di tabel
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'guru'    => $guru
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan sistem: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function tambahDataAkunGuru(Request $request)
+    {
+        // Validasi Inputan Form
+        $validator = Validator::make($request->all(), [
+            'nama_lengkap' => 'required|string|max:255',
+            'username'     => 'required|string|max:255|unique:login_users,username',
+            'password'     => 'required|string|min:4',
+        ], [
+            'username.unique' => 'Username ini sudah terdaftar di sistem.',
+            'password.min'    => 'Password minimal harus 4 karakter.',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => $validator->errors()->first()
+            ], 422);
+        }
+
+        try {
+            // Ambil sekolah_id dari admin yang sedang login
+            $sekolahId = auth()->user()->sekolah_id ?? null;
+
+            if (!$sekolahId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Sesi admin telah berakhir, silakan login kembali.'
+                ], 401);
+            }
+            $paketLayanan = auth()->user()->paket_layanan ?? 'free'; 
+
+            if (strtolower($paketLayanan) === 'free') {
+                // Hitung total akun dengan role 'guru' yang sudah ada di sekolah ini
+                $jumlahGuruSoreIni = LoginUser::where('sekolah_id', $sekolahId)
+                    ->where('role', 'guru')
+                    ->count();
+
+                if ($jumlahGuruSoreIni >= 1) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Batas Paket Free Tercapai! Paket gratis hanya diperbolehkan memiliki maksimal 1 akun guru. Silakan upgrade paket untuk menambahkan akun tanpa batas.'
+                    ], 422); // Status 422 untuk Unprocessable Entity / Isian Ditolak
+                }
+            }
+
+            LoginUser::create([
+                'sekolah_id'   => $sekolahId,
+                'username'     => $request->username,
+                'password'     => $request->password, 
+                'nama_lengkap' => $request->nama_lengkap,
+                'no_whatsapp'  => null,
+                'role'         => 'guru', 
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Akun guru berhasil didaftarkan.'
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menyimpan data: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }
