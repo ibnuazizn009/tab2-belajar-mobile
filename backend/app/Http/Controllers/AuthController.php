@@ -57,9 +57,11 @@ class AuthController extends Controller
                 return response()->json(['success' => false, 'message' => 'Gagal membuat token, coba lagi.'], 500);
             }
 
-            $kelas = Kelas::where('guru_id', $user->id)
-                        ->where('sekolah_id', $user->sekolah_id)
-                        ->first();
+            $kelas = Kelas::join('data_gurus', 'kelas.guru_id', '=', 'data_gurus.id')
+                    ->where('data_gurus.login_user_id', $user->id)
+                    ->where('kelas.sekolah_id', $user->sekolah_id)
+                    ->select('kelas.*')
+                    ->first();
 
             $statusAkun = LicenseChecker::checkStatus($user->sekolah);
 

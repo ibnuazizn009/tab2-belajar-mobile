@@ -31,6 +31,7 @@
         
         <form id="form-guru" class="space-y-4">
             <input type="hidden" name="nama_lengkap" id="hidden-nama-lengkap" required>
+            <input type="hidden" name="data_guru_id" id="hidden-data-guru-id" required>
             
             <div class="relative" id="combobox-container">
                 <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Nama Lengkap Guru</label>
@@ -86,7 +87,7 @@
 </div>
 
 <script>
-    const tokenJwt = localStorage.getItem('token_jwt');
+
     let masterGuruData = []; // Menyimpan salinan data master guru dari API
 
     function toggleRowPassword(btn) {
@@ -303,15 +304,16 @@
 
         dropdown.innerHTML = items.map(guru => `
             <div class="p-2.5 px-3 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-600 cursor-pointer font-medium transition" 
-                 onclick="selectGuruOption('${guru.nama_guru}')">
+                onclick="selectGuruOption(${guru.id}, '${guru.nama_guru}')">
                 ${guru.nama_guru} <span class="text-[10px] text-slate-400 font-mono ml-1">(${guru.nip ? guru.nip : 'Tanpa NIP'})</span>
             </div>
         `).join('');
     }
 
-    function selectGuruOption(namaGuru) {
+    function selectGuruOption(id, namaGuru) {
         document.getElementById('search-guru-input').value = namaGuru;
         document.getElementById('hidden-nama-lengkap').value = namaGuru;
+        document.getElementById('hidden-data-guru-id').value = id;
         document.getElementById('guru-dropdown-list').classList.add('hidden');
     }
 
@@ -346,7 +348,9 @@
 
         // Validasi: Pastikan user memilih guru dari opsi resmi combobox
         const validNama = document.getElementById('hidden-nama-lengkap').value;
-        if (!validNama) {
+        const validDataGuruId = document.getElementById('hidden-data-guru-id').value;
+
+        if (!validNama || !validDataGuruId) {
             Swal.fire({
                 icon: 'warning',
                 title: 'Pilihan Tidak Valid',
@@ -419,6 +423,7 @@
 
                 this.reset();
                 searchInput.value = '';
+                document.getElementById('hidden-data-guru-id').value = '';
             }
         })
         .catch(err => {

@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Sekolah;
 use App\Models\LoginUser;
+use App\Models\JenjangSekolah;
+use App\Models\Kota;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -14,9 +16,9 @@ class SuperAdminController extends Controller
 {
     public function showRegisterForm()
     {
-        $jenjangs = DB::table('jenjang_sekolah')->orderBy('id', 'asc')->get();
+        $jenjangs = JenjangSekolah::orderBy('id', 'asc')->get();
 
-        $kotas = DB::table('kota')->orderBy('nama_kota', 'asc')->get();
+        $kotas = Kota::orderBy('nama_kota', 'asc')->get();
 
         $paket_terpilih = request()->query('paket', 'BRONZE');
 
@@ -58,7 +60,7 @@ class SuperAdminController extends Controller
                 $isPremium = 1; 
                 $expiresAt = Carbon::now()->addDays(30); // Masa aktif SILVER 30 hari
             } else { // GOLDEN
-                $isPremium = 2; 
+                $isPremium = 1; 
                 $expiresAt = Carbon::now()->addDays(30); // Masa aktif GOLDEN 30 hari
             }
 
@@ -70,7 +72,8 @@ class SuperAdminController extends Controller
                 'status'             => $request->status,
                 'alamat'             => $request->alamat,
                 'kota_id'            => $request->kota_id,
-                'is_premium'         => $isPremium, // 👈 Terisi angka 0, 1, atau 2
+                'is_premium'         => $isPremium,
+                'paket_layanan'      => $request->paket_layanan,
                 'premium_expires_at' => $expiresAt, 
             ]);
 

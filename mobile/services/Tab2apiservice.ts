@@ -154,7 +154,8 @@ export const tab2ApiService = {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Accept: 'application/json'
+          Accept: 'application/json',
+          'X-Client-Platform': 'mobile'
         },
         body: JSON.stringify(data)
       })
@@ -330,7 +331,7 @@ export const tab2ApiService = {
 
   postMultipart: async (url: string, formData: FormData) => {
     try {
-      const token = await SecureStore.getItemAsync('token');
+      const token = await SecureStore.getItemAsync('access_token');
       const response = await axios.post(url, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -342,5 +343,5 @@ export const tab2ApiService = {
       console.error('Error postMultipart:', error);
       throw error;
     }
-  },
+  },  
 }

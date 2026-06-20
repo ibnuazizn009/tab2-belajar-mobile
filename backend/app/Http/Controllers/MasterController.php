@@ -16,7 +16,7 @@ class MasterController extends Controller
      */
     public function __construct()
     {
-        $this->middleware('auth:api', ['except' => ['getAllKota', 'getSekolahByKota']]);
+        $this->middleware('jwt.cookie', ['except' => ['getAllKota', 'getSekolahByKota']]);
     }
 
     public function getAllKota()
@@ -65,6 +65,33 @@ class MasterController extends Controller
         $daftarKelas = Kelas::where('sekolah_id', $user->sekolah_id)
                             ->orderBy('tingkat', 'asc')
                             ->orderBy('nama_kelas', 'asc')
+                            ->get();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Berhasil mengambil data kelas internal sekolah Anda',
+            'data'    => $daftarKelas
+        ], 200);
+    }
+
+    public function getAllKelasAdmin(Request $request)
+    {
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
+            'sekolah_id' => 'required|exists:sekolah,id'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => $validator->errors()->first()
+            ], 422);
+        }
+
+        $daftarKelas = Kelas::leftJoin('data_gurus', 'kelas.guru_id', '=', 'data_gurus.id')
+                            ->where('kelas.sekolah_id', $request->sekolah_id)
+                            ->orderBy('kelas.tingkat', 'asc')
+                            ->orderBy('kelas.nama_kelas', 'asc')
+                            ->select('kelas.*', 'data_gurus.nama_guru')
                             ->get();
 
         return response()->json([

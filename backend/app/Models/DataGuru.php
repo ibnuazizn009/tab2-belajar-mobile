@@ -13,6 +13,7 @@ class DataGuru extends Model
 
     protected $fillable = [
         'sekolah_id',
+        'login_user_id',
         'nip',
         'nama_guru',
         'jenis_kelamin',

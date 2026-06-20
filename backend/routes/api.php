@@ -59,6 +59,9 @@ Route::middleware(['jwt.cookie'])->group(function () use ($prefix) {
         Route::post("$prefix/admin/akun-guru", [AdminSekolahController::class, 'tambahDataAkunGuru']);
         Route::get("$prefix/admin/akun-guru-list", [AdminSekolahController::class, 'getDataAkunGuru']);
         Route::post("$prefix/admin/guru/reset-password", [AdminSekolahController::class, 'resetPasswordGuru']);
+
+        Route::post("$prefix/admin/kelas", [AdminSekolahController::class, 'tambahDataKelas']);
+        Route::get("$prefix/admin/kelas-admin", [MasterController::class, 'getAllKelasAdmin']);
         
         Route::post("$prefix/admin/update-foto", [AdminSekolahController::class, 'updateFotoProfil']);
         Route::post("$prefix/admin/update-password", [AdminSekolahController::class, 'updatePasswordSelf']);

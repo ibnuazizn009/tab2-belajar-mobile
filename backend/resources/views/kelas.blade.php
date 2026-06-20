@@ -147,8 +147,6 @@
 <script>
     // Ambil endpoint rute master kelas yang sudah ada di api.php Anda
     // Route::get("$prefix/master/kelas", [MasterController::class, 'getAllKelas']);
-    API_ROUTES.getKelas = '/api/services/tab2one/master/kelas';
-    API_ROUTES.postKelas = '/api/services/tab2one/admin/kelas'; // Sesuaikan jika ada rute simpan nanti
 
     document.addEventListener("DOMContentLoaded", function() {
         
@@ -182,7 +180,7 @@
         document.getElementById('input-nama-sekolah').value = namaSekolah;
 
         function muatDaftarKelas() {
-            fetch(API_ROUTES.getKelas, {
+            fetch(`${API_ROUTES.getKelas}?sekolah_id=${sekolahId}`, {
                 method: 'GET',
                 credentials: 'include',
                 headers: { 'Accept': 'application/json' }
@@ -212,7 +210,7 @@
                                 <td class="py-3 px-4 font-bold text-slate-400">${index + 1}</td>
                                 <td class="py-3 px-4 font-bold text-slate-900">${kelas.nama_kelas}</td>
                                 <td class="py-3 px-4"><span class="px-2 py-0.5 bg-blue-50 text-blue-600 font-bold rounded text-[10px]">${kelas.tingkat ? 'Tingkat ' + kelas.tingkat : '-'}</span></td>
-                                <td class="py-3 px-4 text-slate-500">${kelas.guru ? kelas.guru.nama : '<span class="text-slate-300 italic">Belum Ditentukan</span>'}</td>
+                                <td class="py-3 px-4 text-slate-500">${kelas.nama_guru ? kelas.nama_guru : '<span class="text-slate-300 italic">Belum Ditentukan</span>'}</td>
                             </tr>
                         `;
                     });
@@ -226,6 +224,42 @@
 
         // Jalankan pemuatan otomatis saat halaman dibuka
         muatDaftarKelas();
+
+        function muatDaftarGuru() {
+            fetch(API_ROUTES.getDataGuru, {
+                method: 'GET',
+                credentials: 'include',
+                headers: { 'Accept': 'application/json' }
+            })
+            .then(res => {
+                if (res.status === 401 || res.status === 403) {
+                    window.location.href = "/login";
+                    return;
+                }
+                return res.json();
+            })
+            .then(resJson => {
+                if (resJson && resJson.success) {
+                    const dataGuru = resJson.data;
+                    const selectGuru = document.getElementById('guru_id');
+
+                    selectGuru.innerHTML = '<option value="">-- Pilih Wali Kelas (Opsional) --</option>';
+
+                    dataGuru.forEach(guru => {
+                        const opt = document.createElement('option');
+                        opt.value = guru.id;
+                        opt.innerText = guru.nama_guru;
+                        selectGuru.appendChild(opt);
+                    });
+                }
+            })
+            .catch(err => {
+                console.error("Gagal mengambil data guru:", err);
+            });
+        }
+
+
+        muatDaftarGuru();
 
         document.getElementById('formKelas').addEventListener('submit', function(e) {
             e.preventDefault();

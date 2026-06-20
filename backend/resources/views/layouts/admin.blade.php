@@ -129,7 +129,9 @@
             getDataGuru : '/api/services/tab2one/admin/data-guru-list',
             postAkunGuru : '/api/services/tab2one/admin/akun-guru',
             getAkunGuru : '/api/services/tab2one/admin/akun-guru-list',
-            resetPasswordGuru : '/api/services/tab2one/admin/guru/reset-password'
+            resetPasswordGuru : '/api/services/tab2one/admin/guru/reset-password',
+            getKelas : '/api/services/tab2one/admin/kelas-admin',
+            postKelas : '/api/services/tab2one/admin/kelas'
 
         };
 

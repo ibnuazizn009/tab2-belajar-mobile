@@ -135,7 +135,7 @@ export default function TabLayout() {
       if (responseData && responseData.success && responseData.data) {
         
         const apiData = responseData.data;
-  
+        console.log(apiData);
         await Promise.all([
           SecureStore.setItemAsync('access_token', apiData.access_token),
           SecureStore.setItemAsync('user_info', JSON.stringify(apiData.user || {}))
