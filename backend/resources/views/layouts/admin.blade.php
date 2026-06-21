@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>@yield('title') - E-Tabungan</title>
+
+    <link rel="icon" type="image/x-icon" href="/favicon_ico.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -76,13 +78,16 @@
                     <a href="/pengaturan" class="flex items-center gap-3 px-4 py-3 text-xs font-semibold rounded-xl transition-all duration-200 {{ request()->is('pengaturan') ? 'bg-blue-50 text-blue-600 shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
                         <i class="fa-solid fa-sliders text-base w-5"></i> Pengaturan
                     </a>
+                    <a href="/download-app" class="flex items-center gap-3 px-4 py-3 text-xs font-semibold rounded-xl transition-all duration-200 {{ request()->is('download-app') ? 'bg-blue-50 text-blue-600 shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' }}">
+                        <i class="fa-solid fa-mobile-screen-button text-base w-5"></i> Download App Guru
+                    </a>
                 </nav>
 
                 <div class="p-4 border-t border-slate-50 bg-slate-50/50 mt-auto">
                     <div class="bg-white border border-slate-100 p-3.5 rounded-2xl shadow-xs flex flex-col gap-3">
                         
                         <div class="flex items-center gap-3 min-w-0">
-                            <img id="sidebar-avatar" src="https://ui-avatars.com/api/?background=3b82f6&color=fff&name=Admin" class="w-9 h-9 rounded-xl border border-slate-100 object-cover shrink-0">
+                            <img id="sidebar-avatar" src="https://ui-avatars.com/api/?background=3b82f6&color=fff&name=Admin" class="w-9 h-9 rounded-xl border border-slate-100 object-cover shrink-0 opacity-0 transition-opacity duration-150">
                             <div class="min-w-0 flex-grow">
                                 <p id="txt-sidebar-nama" class="text-xs font-bold text-slate-900 truncate">Admin</p>
                                 <p id="txt-sidebar-sekolah" class="text-[10px] font-medium text-slate-400 truncate">Memuat...</p>
@@ -109,7 +114,7 @@
                     <span class="text-xs font-bold text-slate-900 tracking-wide uppercase">@yield('title')</span>
                 </div>
                 <div class="flex items-center gap-2">
-                    <img id="top-navbar-avatar" src="https://ui-avatars.com/api/?background=3b82f6&color=fff&name=Admin" class="w-7 h-7 rounded-lg">
+                    <img id="top-navbar-avatar" src="https://ui-avatars.com/api/?background=3b82f6&color=fff&name=Admin" class="w-7 h-7 rounded-lg opacity-0 transition-opacity duration-150">
                 </div>
             </header>
 
@@ -135,6 +140,8 @@
             getTransaksi : '/api/services/tab2one/admin/guru/transaksi',
             toggleStatusGuru : (id) => `/api/services/tab2one/admin/guru/statusAkunGuru/${id}`,
             resetSesiGuru : (id) => `/api/services/tab2one/admin/guru/resetSesiGuru/${id}`,
+            resetPasswordAdmin : '/api/services/tab2one/admin/update-password',
+            uploadFoto : '/api/services/tab2one/admin/update-foto'
 
         };
 
@@ -184,6 +191,17 @@
                 }
             }).then((result) => {
                 if (result.isConfirmed) {
+                    Swal.fire({
+                        title: 'Sedang Keluar...',
+                        width: '280px',
+                        allowOutsideClick: false,
+                        customClass: {
+                            title: 'text-sm font-bold text-slate-800',
+                            popup: 'rounded-2xl p-4'
+                        },
+                        didOpen: () => { Swal.showLoading(); }
+                    });
+
                     fetch(API_ROUTES.logout, {
                         method: 'POST',
                         credentials: 'include'
@@ -207,6 +225,19 @@
             if (textElement) {
                 textElement.innerText = namaSekolah;
             }
+
+            const fotoTersimpan = localStorage.getItem('foto_profil');
+            const sidebarAvatar = document.getElementById('sidebar-avatar');
+            const navbarAvatar = document.getElementById('top-navbar-avatar');
+
+            if (fotoTersimpan && fotoTersimpan !== 'null') {
+                if (sidebarAvatar) sidebarAvatar.src = fotoTersimpan;
+                if (navbarAvatar) navbarAvatar.src = fotoTersimpan;
+            }
+
+            if (sidebarAvatar) sidebarAvatar.classList.remove('opacity-0');
+            if (navbarAvatar) navbarAvatar.classList.remove('opacity-0');
+
         });
     </script>
     @yield('scripts')

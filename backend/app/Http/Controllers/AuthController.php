@@ -5,12 +5,13 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Tymon\JWTAuth\Exceptions\JWTException;
+use Illuminate\Support\Facades\Cookie;
+use Illuminate\Support\Facades\Storage;
 use App\Models\LoginUser;
 use App\Models\Kelas;
 use App\Models\DataGuru;
 use Carbon\Carbon;
 use App\Helpers\LicenseChecker;
-use Illuminate\Support\Facades\Cookie;
 
 class AuthController extends Controller
 {
@@ -74,7 +75,6 @@ class AuthController extends Controller
                 return response()->json(['success' => false, 'message' => 'Gagal membuat token, coba lagi.'], 500);
             }
 
-            // ✅ Token berhasil dibuat -> tandai akun sedang digunakan
             $user->is_use = true;
             $user->save();
 
@@ -92,7 +92,7 @@ class AuthController extends Controller
             // Hitung sisa hari paket secara dinamis
             $sisaHariPaket = null;
             if ($user->sekolah) {
-                if ($user->sekolah->paket_layanan === 'free') {
+                if ($user->sekolah->paket_layanan === 'BRONZE') {
                     $sisaHariPaket = max(0, 7 - \Carbon\Carbon::parse($user->sekolah->created_at)->diffInDays(\Carbon\Carbon::now('Asia/Jakarta')));
                 } else {
                     // Jika paket berbayar/premium, hitung selisih dari tanggal premium_expires_at ke hari ini
@@ -121,10 +121,11 @@ class AuthController extends Controller
                     'guru_id'         => $dataGuru ? $dataGuru->id : null,
                     'kelas_id'        => $daftarKelas->first()->id ?? null,
                     'sekolah'      => $user->sekolah,
-                    'paket_layanan'   => $user->sekolah ? $user->sekolah->paket_layanan : 'free',
+                    'paket_layanan'   => $user->sekolah ? $user->sekolah->paket_layanan : 'BRONZE',
                     'status_akun'     => $statusAkun,
                     'sisa_hari_paket' => $sisaHariPaket,
                     'expired_at'      => $user->sekolah ? $user->sekolah->premium_expires_at : null,
+                    'foto_url'        => $user->foto ? Storage::url($user->foto) : null,
                 ],
             ];
 

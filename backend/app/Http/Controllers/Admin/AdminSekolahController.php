@@ -8,10 +8,13 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use App\Models\LoginUser;
 use App\Models\Kelas;
 use App\Models\DataGuru;
 use App\Models\Transaksi;
+use App\Models\Sekolah;
+use Illuminate\Validation\Rules\Password;
 
 class AdminSekolahController extends Controller
 {
@@ -185,83 +188,81 @@ class AdminSekolahController extends Controller
         }
     }
 
-    /**
-     * 4. Ubah Password Mandiri (Admin Sendiri / Guru Sendiri)
-     */
     public function updatePasswordSelf(Request $request)
     {
-        /** @var \App\Models\LoginUser $user */
-        $user = auth('api')->user();
-
-        $validator = Validator::make($request->all(), [
+        $request->validate([
             'current_password' => 'required|string',
-            'new_password'     => 'required|string|min:6',
+            'new_password' => 'required|string|min:6',
+        ]);
+    
+        $authUser = auth('api')->user();
+        if (!$authUser) {
+            return response()->json(['success' => false, 'message' => 'Tidak terautentikasi.'], 401);
+        }
+    
+        $loginUser = LoginUser::find($authUser->id);
+        if (!$loginUser) {
+            return response()->json(['success' => false, 'message' => 'Akun tidak ditemukan.'], 404);
+        }
+    
+        if (!Hash::check($request->current_password, $loginUser->password)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Password lama yang Anda masukkan salah.'
+            ], 422);
+        }
+    
+        $loginUser->password = Hash::make($request->new_password);
+        $loginUser->is_use = false; // Force logout — wajib login ulang dengan password baru
+        $loginUser->save();
+    
+        try {
+            auth('api')->logout();
+        } catch (\Exception $e) {
+            // Token mungkin sudah tidak valid, abaikan — is_use sudah ke-update
+        }
+    
+        return response()->json([
+            'success' => true,
+            'message' => 'Password berhasil diperbarui. Silakan login kembali dengan password baru Anda.',
+            'force_logout' => true,
+        ]);
+    }
+
+    public function updateFotoProfil(Request $request)
+    {
+        $request->validate([
+            'foto' => 'required|image|mimes:jpg,jpeg,png,webp|max:2048', // max 2MB
         ]);
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validasi gagal.',
-                'errors'  => $validator->errors()
-            ], 422);
+        $authUser = auth('api')->user();
+        if (!$authUser) {
+            return response()->json(['success' => false, 'message' => 'Tidak terautentikasi.'], 401);
         }
 
-        if (!Hash::check($request->current_password, $user->password)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Password saat ini yang Anda masukkan salah.'
-            ], 422);
+        $loginUser = LoginUser::find($authUser->id);
+        if (!$loginUser) {
+            return response()->json(['success' => false, 'message' => 'Akun tidak ditemukan.'], 404);
         }
 
-        $user->password = Hash::make($request->new_password);
-        $user->save();
+        $sekolah = Sekolah::find($loginUser->sekolah_id);
+        $namaFolder = $sekolah ? Str::slug($sekolah->nama_sekolah) : 'sekolah-' . $loginUser->sekolah_id;
+
+        // Hapus foto lama dari storage kalau ada, sebelum simpan yang baru
+        if ($loginUser->foto && Storage::disk('public')->exists($loginUser->foto)) {
+            Storage::disk('public')->delete($loginUser->foto);
+        }
+
+        $path = $request->file('foto')->store("foto-profil/{$namaFolder}", 'public');
+
+        $loginUser->foto = $path;
+        $loginUser->save();
 
         return response()->json([
             'success' => true,
-            'message' => 'Password akun Anda berhasil diubah.'
-        ], 200);
-    }
-
-    /**
-     * 5. Ubah Foto Profil Mandiri
-     */
-    public function updateFotoProfil(Request $request)
-    {
-        /** @var \App\Models\LoginUser $user */
-        $user = auth('api')->user();
-
-        $validator = Validator::make($request->all(), [
-            'foto' => 'required|image|mimes:jpeg,png,jpg|max:2048',
+            'message' => 'Foto profil berhasil diperbarui.',
+            'foto_url' => Storage::url($path),
         ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'File harus berupa gambar (JPG/PNG) dengan ukuran maksimal 2MB.'
-            ], 422);
-        }
-
-        if ($request->hasFile('foto')) {
-            if ($user->foto_profil && Storage::disk('public')->exists($user->foto_profil)) {
-                Storage::disk('public')->delete($user->foto_profil);
-            }
-
-            $pathFile = $request->file('foto')->store('profiles', 'public');
-
-            $user->foto_profil = $pathFile;
-            $user->save();
-
-            return response()->json([
-                'success'  => true,
-                'message'  => 'Foto profil berhasil diperbarui.',
-                'foto_url' => asset('storage/' . $pathFile)
-            ], 200);
-        }
-
-        return response()->json([
-            'success' => false,
-            'message' => 'Gagal mengunggah gambar.'
-        ], 400);
     }
 
     public function getDataAkunGuru(Request $request)

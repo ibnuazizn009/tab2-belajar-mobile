@@ -36,6 +36,9 @@ Route::get('/login', function () {
 
 Route::get('/register', [SuperAdminController::class, 'showRegisterForm'])->name('register');
 Route::post('/register', [SuperAdminController::class, 'registerSekolahBaru'])->name('register.proses');
+Route::get('/download-app', function () {
+    return view('download-app');
+});
 
 Route::get('/test-no-auth', function () {
     return 'Halaman ini berhasil diakses tanpa redirect';

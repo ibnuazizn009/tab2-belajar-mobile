@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Masuk - E-Tabungan Sekolah</title>
+
+    <link rel="icon" type="image/x-icon" href="/favicon_ico.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -173,6 +175,7 @@
                     localStorage.setItem('paket_layanan', data.user.paket_layanan);
                     localStorage.setItem('sekolah_id', data.user.sekolah_id);
                     localStorage.setItem('sisa_hari_paket', data.user.sisa_hari_paket);
+                    localStorage.setItem('foto_profil', data.user.foto_url);
 
                     Swal.fire({
                         icon: 'success', 
