@@ -125,13 +125,16 @@
             login: '/api/services/tab2one/auth/login',
             logout: '/api/services/tab2one/auth/logout',
             dashboard: '/api/services/tab2one/admin/dashboard',
-            postDataGuru : '/api/services/tab2one/admin/data-guru',
-            getDataGuru : '/api/services/tab2one/admin/data-guru-list',
-            postAkunGuru : '/api/services/tab2one/admin/akun-guru',
-            getAkunGuru : '/api/services/tab2one/admin/akun-guru-list',
+            postDataGuru : '/api/services/tab2one/admin/guru/data-guru',
+            getDataGuru : '/api/services/tab2one/admin/guru/data-guru-list',
+            postAkunGuru : '/api/services/tab2one/admin/guru/akun-guru',
+            getAkunGuru : '/api/services/tab2one/admin/guru/akun-guru-list',
             resetPasswordGuru : '/api/services/tab2one/admin/guru/reset-password',
-            getKelas : '/api/services/tab2one/admin/kelas-admin',
-            postKelas : '/api/services/tab2one/admin/kelas'
+            getKelas : '/api/services/tab2one/admin/guru/kelas-admin',
+            postKelas : '/api/services/tab2one/admin/guru/kelas',
+            getTransaksi : '/api/services/tab2one/admin/guru/transaksi',
+            toggleStatusGuru : (id) => `/api/services/tab2one/admin/guru/statusAkunGuru/${id}`,
+            resetSesiGuru : (id) => `/api/services/tab2one/admin/guru/resetSesiGuru/${id}`,
 
         };
 

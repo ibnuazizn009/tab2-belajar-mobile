@@ -20,8 +20,15 @@
     </div>
 </div>
 
-<h2 class="text-xl font-black text-slate-900 tracking-tight">Manajemen Akun Guru</h2>
-<p class="text-xs text-slate-500 mt-1 mb-6">Kelola akun tenaga pengajar untuk akses sistem tabungan.</p>
+<div class="flex justify-between items-center mb-6">
+    <div>
+        <h2 class="text-xl font-black text-slate-900 tracking-tight">Manajemen Akun Guru</h2>
+        <p class="text-xs text-slate-500 mt-1">Kelola akun tenaga pengajar untuk akses sistem tabungan.</p>
+    </div>
+    <button id="btn-refresh-guru" onclick="loadDaftarAkunGuru()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed shrink-0">
+        <i class="fa-solid fa-arrows-rotate mr-2"></i> Refresh Data
+    </button>
+</div>
 
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     
@@ -68,23 +75,32 @@
 
     <div class="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm lg:col-span-2">
         <h3 class="text-sm font-bold text-slate-900 mb-4"><i class="fa-solid fa-users text-blue-600 mr-1"></i> Daftar Guru Aktif</h3>
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto overflow-y-visible">
             <table class="w-full text-left text-sm text-slate-600">
                 <thead class="bg-slate-50 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
                     <tr>
                         <th class="p-3">Nama Guru</th>
                         <th class="p-3">Username</th>
-                        <th class="p-3">Password</th> 
+                        <th class="p-3">Password</th>
+                        <th class="p-3 text-center">Status</th>
                         <th class="p-3 text-center">Aksi</th>
                     </tr>
                 </thead>
                 <tbody id="table-guru-body" class="divide-y divide-slate-100">
-                    <tr><td colspan="4" class="p-4 text-center text-xs text-slate-400">Memuat data...</td></tr>
+                    <tr>
+                        <td colspan="5" class="p-8 text-center text-xs text-slate-400">
+                            <i class="fa-solid fa-spinner fa-spin mr-2"></i> Memuat data guru...
+                        </td>
+                    </tr>
                 </tbody>
             </table>
         </div>
     </div>
 </div>
+
+<!-- Dropdown aksi global: dipindah ke luar tabel & pakai fixed positioning
+     agar tidak terpotong oleh overflow/stacking-context elemen parent manapun. -->
+<div id="aksi-dropdown-global" class="hidden fixed z-50 w-44 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden text-left"></div>
 
 <script>
 
@@ -126,7 +142,92 @@
         }
     });
 
+    let guruDataMap = {}; // Menyimpan data guru per-id untuk dipakai dropdown aksi global
+
+    // Menutup dropdown aksi global yang sedang terbuka
+    function closeAllAksiDropdown() {
+        document.getElementById('aksi-dropdown-global').classList.add('hidden');
+    }
+
+    // Buka/tutup dropdown aksi untuk satu baris guru tertentu.
+    // Dropdown-nya satu elemen global ber-fixed-position, dipindah & diisi ulang
+    // tiap kali dipanggil, supaya tidak pernah terpotong oleh overflow elemen lain.
+    function toggleAksiDropdown(event, id) {
+        event.stopPropagation();
+        const dropdown = document.getElementById('aksi-dropdown-global');
+        const btn = event.currentTarget;
+
+        // Jika dropdown sedang terbuka untuk tombol yang sama, tutup saja (toggle)
+        const isSameTarget = dropdown.dataset.openFor === String(id);
+        if (!dropdown.classList.contains('hidden') && isSameTarget) {
+            closeAllAksiDropdown();
+            return;
+        }
+
+        const g = guruDataMap[id];
+        if (!g) return;
+
+        const isActive = !!g.is_active;
+        const isUse = !!g.is_use;
+
+        dropdown.innerHTML = `
+            <button onclick="closeAllAksiDropdown(); resetPassword('${g.username}')" class="w-full px-3 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition flex items-center gap-2">
+                <i class="fa-solid fa-key text-amber-500 w-3.5"></i> Reset Password
+            </button>
+            ${isUse ? `
+            <button onclick="closeAllAksiDropdown(); resetSesiGuru(${g.id}, '${g.nama_lengkap}')" class="w-full px-3 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition flex items-center gap-2 border-t border-slate-100">
+                <i class="fa-solid fa-rotate-left text-blue-500 w-3.5"></i> Reset Sesi
+            </button>` : ''}
+            <button onclick="closeAllAksiDropdown(); toggleStatusGuru(${g.id}, '${g.nama_lengkap}', ${isActive})" class="w-full px-3 py-2.5 text-xs font-semibold ${isActive ? 'text-red-600' : 'text-emerald-600'} hover:bg-slate-50 transition flex items-center gap-2 border-t border-slate-100">
+                <i class="fa-solid ${isActive ? 'fa-ban' : 'fa-circle-check'} w-3.5"></i> ${isActive ? 'Nonaktifkan' : 'Aktifkan'}
+            </button>
+        `;
+
+        // Hitung posisi tombol di viewport, lalu posisikan dropdown tepat di bawahnya (rata kanan)
+        const rect = btn.getBoundingClientRect();
+        const dropdownWidth = 176; // w-44 = 11rem = 176px
+        let left = rect.right - dropdownWidth;
+        if (left < 8) left = 8; // jangan sampai keluar tepi kiri viewport
+
+        dropdown.style.left = `${left}px`;
+        dropdown.style.top = `${rect.bottom + 4}px`;
+
+        // Jika dropdown akan terpotong di bawah viewport, tampilkan ke atas tombol
+        const estimatedHeight = dropdown.scrollHeight || 140;
+        if (rect.bottom + 4 + estimatedHeight > window.innerHeight) {
+            dropdown.style.top = `${rect.top - estimatedHeight - 4}px`;
+        }
+
+        dropdown.dataset.openFor = String(id);
+        dropdown.classList.remove('hidden');
+    }
+
+    // Tutup dropdown aksi jika klik di luar area dropdown/tombol
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('#aksi-dropdown-global') && !e.target.closest('[onclick^="toggleAksiDropdown"]')) {
+            closeAllAksiDropdown();
+        }
+    });
+
+    // Tutup dropdown aksi saat scroll atau resize, supaya tidak mengambang salah posisi
+    window.addEventListener('scroll', closeAllAksiDropdown, true);
+    window.addEventListener('resize', closeAllAksiDropdown);
+
     function loadDaftarAkunGuru() {
+        const tbody = document.getElementById('table-guru-body');
+        const btnRefresh = document.getElementById('btn-refresh-guru');
+
+        // Set loading state pada tombol & tabel
+        btnRefresh.disabled = true;
+        btnRefresh.innerHTML = `<i class="fa-solid fa-arrows-rotate mr-2 fa-spin"></i> Memuat...`;
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="p-8 text-center text-xs text-slate-400">
+                    <i class="fa-solid fa-spinner fa-spin mr-2"></i> Memuat data guru...
+                </td>
+            </tr>
+        `;
+
         fetch(API_ROUTES.getAkunGuru, {
             method: 'GET',
             headers: { 
@@ -136,10 +237,13 @@
         })
         .then(res => res.json())
         .then(data => {
-            const tbody = document.getElementById('table-guru-body');
             if(data.guru && data.guru.length > 0) {
-                tbody.innerHTML = data.guru.map(g => `
-                    <tr class="hover:bg-slate-50/50 transition">
+                tbody.innerHTML = data.guru.map(g => {
+                    const isActive = !!g.is_active;
+                    const isUse = !!g.is_use;
+
+                    return `
+                    <tr class="hover:bg-slate-50/50 transition ${!isActive ? 'opacity-50' : ''}">
                         <td class="p-3 font-semibold text-slate-800">${g.nama_lengkap}</td>
                         <td class="p-3 font-mono text-xs text-slate-500">${g.username}</td>
                         
@@ -154,13 +258,188 @@
                         </td>
 
                         <td class="p-3 text-center">
-                            <button onclick="resetPassword('${g.username}')" class="text-[11px] font-bold bg-amber-50 hover:bg-amber-100 text-amber-600 px-2.5 py-1 rounded-lg border border-amber-200 transition">Reset</button>
+                            <div class="flex items-center justify-center gap-1.5">
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'}">
+                                    ${isActive ? 'Aktif' : 'Nonaktif'}
+                                </span>
+                                ${isUse ? `<span class="inline-flex items-center text-[9px] font-bold uppercase text-blue-600" title="Sedang login"><i class="fa-solid fa-circle text-[6px] mr-1"></i>Online</span>` : ''}
+                            </div>
+                        </td>
+
+                        <td class="p-3 text-center">
+                            <button type="button" onclick="toggleAksiDropdown(event, ${g.id})" class="text-slate-400 hover:text-slate-700 hover:bg-slate-100 w-8 h-8 rounded-lg transition inline-flex items-center justify-center">
+                                <i class="fa-solid fa-ellipsis-vertical text-xs"></i>
+                            </button>
                         </td>
                     </tr>
-                `).join('');
+                `}).join('');
+
+                // Simpan data guru per-id agar bisa diakses saat membangun isi dropdown aksi global
+                guruDataMap = {};
+                data.guru.forEach(g => { guruDataMap[g.id] = g; });
             } else {
-                tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-xs text-slate-400">Belum ada data guru aktif.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-xs text-slate-400">Belum ada data guru aktif.</td></tr>`;
             }
+        })
+        .catch(err => {
+            console.error(err);
+            tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-xs text-red-400">Gagal memuat data.</td></tr>`;
+        })
+        .finally(() => {
+            btnRefresh.disabled = false;
+            btnRefresh.innerHTML = `<i class="fa-solid fa-arrows-rotate mr-2"></i> Refresh Data`;
+        });
+    }
+
+    function toggleStatusGuru(id, namaGuru, isCurrentlyActive) {
+        const aksiText = isCurrentlyActive ? 'menonaktifkan' : 'mengaktifkan';
+        const aksiTitle = isCurrentlyActive ? 'Nonaktifkan Akun?' : 'Aktifkan Akun?';
+        const warnaTombol = isCurrentlyActive ? '#dc2626' : '#16a34a';
+
+        Swal.fire({
+            icon: 'warning',
+            title: aksiTitle,
+            html: `Anda yakin ingin ${aksiText} akun guru <strong>${namaGuru}</strong>?${isCurrentlyActive ? '<br><span class="text-[11px] text-slate-400">Guru tidak akan bisa login ke aplikasi setelah dinonaktifkan.</span>' : ''}`,
+            showCancelButton: true,
+            confirmButtonText: isCurrentlyActive ? 'Ya, Nonaktifkan' : 'Ya, Aktifkan',
+            cancelButtonText: 'Batal',
+            confirmButtonColor: warnaTombol,
+            cancelButtonColor: '#64748b',
+            width: '380px',
+            customClass: {
+                popup: 'rounded-2xl p-5',
+                title: 'text-sm font-black text-slate-900 tracking-tight mt-2',
+                htmlContainer: 'text-[12px] text-slate-500 leading-relaxed mt-1',
+                confirmButton: 'text-sm px-4 py-2 rounded-xl font-bold',
+                cancelButton: 'text-sm px-4 py-2 rounded-xl font-bold'
+            }
+        }).then((result) => {
+            if (!result.isConfirmed) return;
+
+            Swal.fire({
+                title: 'Memproses...',
+                width: '280px',
+                allowOutsideClick: false,
+                customClass: { title: 'text-sm font-bold text-slate-800', popup: 'rounded-2xl p-4' },
+                didOpen: () => { Swal.showLoading(); }
+            });
+
+            fetch(API_ROUTES.toggleStatusGuru(id), {
+                method: 'PATCH',
+                credentials: 'include',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Berhasil!',
+                        text: data.message,
+                        confirmButtonColor: '#2563eb',
+                        width: '380px',
+                        customClass: { popup: 'rounded-2xl p-5', title: 'text-sm font-black text-slate-900 mt-2', htmlContainer: 'text-[12px] text-slate-500 mt-1', confirmButton: 'text-sm px-4 py-2 rounded-xl font-bold' }
+                    });
+                    loadDaftarAkunGuru();
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Gagal',
+                        text: data.message || 'Gagal memperbarui status akun.',
+                        confirmButtonColor: '#ef4444',
+                        width: '380px',
+                        customClass: { popup: 'rounded-2xl p-5', title: 'text-sm font-black' }
+                    });
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Koneksi Gagal',
+                    text: 'Gagal terhubung ke server.',
+                    confirmButtonColor: '#ef4444',
+                    width: '380px',
+                    customClass: { popup: 'rounded-2xl p-5', title: 'text-sm font-black' }
+                });
+            });
+        });
+    }
+
+    function resetSesiGuru(id, namaGuru) {
+        Swal.fire({
+            icon: 'question',
+            title: 'Reset Sesi Login?',
+            html: `Akun <strong>${namaGuru}</strong> akan dianggap logout, sehingga bisa login kembali dari device manapun.<br><span class="text-[11px] text-slate-400">Gunakan ini jika guru lupa logout atau perangkat hilang.</span>`,
+            showCancelButton: true,
+            confirmButtonText: 'Ya, Reset Sesi',
+            cancelButtonText: 'Batal',
+            confirmButtonColor: '#2563eb',
+            cancelButtonColor: '#64748b',
+            width: '380px',
+            customClass: {
+                popup: 'rounded-2xl p-5',
+                title: 'text-sm font-black text-slate-900 tracking-tight mt-2',
+                htmlContainer: 'text-[12px] text-slate-500 leading-relaxed mt-1',
+                confirmButton: 'text-sm px-4 py-2 rounded-xl font-bold',
+                cancelButton: 'text-sm px-4 py-2 rounded-xl font-bold'
+            }
+        }).then((result) => {
+            if (!result.isConfirmed) return;
+
+            Swal.fire({
+                title: 'Memproses...',
+                width: '280px',
+                allowOutsideClick: false,
+                customClass: { title: 'text-sm font-bold text-slate-800', popup: 'rounded-2xl p-4' },
+                didOpen: () => { Swal.showLoading(); }
+            });
+
+            fetch(API_ROUTES.resetSesiGuru(id), {
+                method: 'PATCH',
+                credentials: 'include',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Berhasil!',
+                        text: data.message,
+                        confirmButtonColor: '#2563eb',
+                        width: '380px',
+                        customClass: { popup: 'rounded-2xl p-5', title: 'text-sm font-black text-slate-900 mt-2', htmlContainer: 'text-[12px] text-slate-500 mt-1', confirmButton: 'text-sm px-4 py-2 rounded-xl font-bold' }
+                    });
+                    loadDaftarAkunGuru();
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Gagal',
+                        text: data.message || 'Gagal mereset sesi.',
+                        confirmButtonColor: '#ef4444',
+                        width: '380px',
+                        customClass: { popup: 'rounded-2xl p-5', title: 'text-sm font-black' }
+                    });
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Koneksi Gagal',
+                    text: 'Gagal terhubung ke server.',
+                    confirmButtonColor: '#ef4444',
+                    width: '380px',
+                    customClass: { popup: 'rounded-2xl p-5', title: 'text-sm font-black' }
+                });
+            });
         });
     }
 

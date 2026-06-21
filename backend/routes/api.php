@@ -54,14 +54,18 @@ Route::middleware(['jwt.cookie'])->group(function () use ($prefix) {
         
         Route::get("$prefix/admin/dashboard", [AdminSekolahController::class, 'getDashboardData']);
         
-        Route::post("$prefix/admin/data-guru", [AdminSekolahController::class, 'tambahDataGuru']);
-        Route::get("$prefix/admin/data-guru-list", [AdminSekolahController::class, 'getDataGuru']);
-        Route::post("$prefix/admin/akun-guru", [AdminSekolahController::class, 'tambahDataAkunGuru']);
-        Route::get("$prefix/admin/akun-guru-list", [AdminSekolahController::class, 'getDataAkunGuru']);
+        Route::post("$prefix/admin/guru/data-guru", [AdminSekolahController::class, 'tambahDataGuru']);
+        Route::get("$prefix/admin/guru/data-guru-list", [AdminSekolahController::class, 'getDataGuru']);
+        Route::post("$prefix/admin/guru/akun-guru", [AdminSekolahController::class, 'tambahDataAkunGuru']);
+        Route::get("$prefix/admin/guru/akun-guru-list", [AdminSekolahController::class, 'getDataAkunGuru']);
         Route::post("$prefix/admin/guru/reset-password", [AdminSekolahController::class, 'resetPasswordGuru']);
+        Route::patch("$prefix/admin/guru/statusAkunGuru/{id}", [AdminSekolahController::class, 'resetStatusAkunGuru']);
+        Route::patch("$prefix/admin/guru/resetSesiGuru/{id}", [AdminSekolahController::class, 'resetSesiGuru']);
 
-        Route::post("$prefix/admin/kelas", [AdminSekolahController::class, 'tambahDataKelas']);
-        Route::get("$prefix/admin/kelas-admin", [MasterController::class, 'getAllKelasAdmin']);
+        Route::get("$prefix/admin/guru/transaksi", [AdminSekolahController::class, 'getAllTransaksi']);
+
+        Route::post("$prefix/admin/guru/kelas", [AdminSekolahController::class, 'tambahDataKelas']);
+        Route::get("$prefix/admin/guru/kelas-admin", [MasterController::class, 'getAllKelasAdmin']);
         
         Route::post("$prefix/admin/update-foto", [AdminSekolahController::class, 'updateFotoProfil']);
         Route::post("$prefix/admin/update-password", [AdminSekolahController::class, 'updatePasswordSelf']);

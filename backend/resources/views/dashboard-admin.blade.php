@@ -21,9 +21,15 @@
             </a>
         </div>
     </div>
-    <div>
-        <h2 class="text-xl font-black text-slate-900 tracking-tight">Dashboard Sekolah</h2>
-        <p class="text-xs text-slate-500 mt-1">Monitoring real-time aktivitas & sistem E-Tabungan.</p>
+    
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+            <h2 class="text-xl font-black text-slate-900 tracking-tight">Dashboard Sekolah</h2>
+            <p class="text-xs text-slate-500 mt-1">Monitoring real-time aktivitas & sistem E-Tabungan.</p>
+        </div>
+        <button id="btn-refresh-dashboard" onclick="muatDataDashboard()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed shrink-0 self-start md:self-auto">
+            <i class="fa-solid fa-arrows-rotate mr-2"></i> Refresh Data
+        </button>
     </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -109,8 +115,9 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
+    window.myChartInstance = null;
+
     document.addEventListener("DOMContentLoaded", function() {
-        // Efek transisi masuk halaman saat DOM selesai di-parse
         const wrapper = document.getElementById('dashboard-wrapper');
         if(wrapper) wrapper.classList.remove('opacity-0');
 
@@ -129,7 +136,6 @@
                 if (descElem) descElem.innerText = "Masa aktif paket premium sekolah Anda telah habis (0 Hari Tersisa). Untuk menghindari gangguan layanan pada aplikasi mobile Guru dan Siswa, mohon segera lakukan perpanjangan paket.";
             }
 
-            // Tampilkan banner merah secara instan tanpa menunggu hantaman API
             const bannerExpired = document.getElementById('banner-expired');
             if (bannerExpired) bannerExpired.classList.remove('hidden');
         }
@@ -151,7 +157,6 @@
         function logoutOtomatis() {
             fetch(API_ROUTES.logout, { method: 'POST', credentials: 'include' })
             .then(() => {
-                // Bersihkan seluruh data sesi lokal sekolah
                 localStorage.removeItem('nama_sekolah');
                 localStorage.removeItem('paket_layanan');
                 localStorage.removeItem('sisa_hari_paket');
@@ -174,6 +179,25 @@
         window.ontouchstart = logActivity;
         var idleCheckInterval = setInterval(cekMasaIdle, 1000); 
 
+        muatDataDashboard();
+    });
+
+    function muatDataDashboard() {
+        const btnRefresh = document.getElementById('btn-refresh-dashboard');
+        
+        // 1. Set status loading pada tombol refresh
+        if (btnRefresh) {
+            btnRefresh.disabled = true;
+            btnRefresh.innerHTML = `<i class="fa-solid fa-arrows-rotate mr-2 fa-spin"></i> Memuat...`;
+        }
+
+        // 2. Set status loading pada komponen card data statistik[cite: 2]
+        const loadingCardTemplate = `<i class="fa-solid fa-spinner fa-spin text-slate-400 text-xs mr-1"></i><span class="text-xs font-normal text-slate-400 tracking-normal">Memuat...</span>`;
+        document.getElementById('stat-siswa').innerHTML = loadingCardTemplate;
+        document.getElementById('stat-guru').innerHTML = loadingCardTemplate;
+        document.getElementById('stat-tabungan').innerHTML = loadingCardTemplate;
+        document.getElementById('stat-transaksi').innerHTML = loadingCardTemplate;
+
         fetch(API_ROUTES.dashboard, {
             method: 'GET',
             credentials: 'include',
@@ -190,32 +214,31 @@
             if (resJson && resJson.success) {
                 const data = resJson.data;
                 
-                // Update Elemen Statistik
+                // Kembalikan isi data asli dari Server API
                 document.getElementById('stat-siswa').innerText = `${data.ringkasan.total_siswa} / ${data.ringkasan.limit_siswa}`;
                 document.getElementById('stat-guru').innerText = data.ringkasan.total_guru;
                 document.getElementById('stat-tabungan').innerText = "Rp " + data.ringkasan.total_tabungan.toLocaleString('id-ID');
                 document.getElementById('stat-transaksi').innerText = data.ringkasan.transaksi_hari_ini + " Log";
 
-                // Perbarui data localStorage dengan data terbaru dari server jika tersedia
                 if (data.sisa_hari_paket !== undefined) {
                     localStorage.setItem('sisa_hari_paket', data.sisa_hari_paket);
                 }
 
-                // Setup Canvas Context untuk Pembuatan Efek Gradasi Gradien
                 const ctx = document.getElementById('chartTransaksi').getContext('2d');
                 
-                // Gradien Warna Hijau (Setoran)
                 const gradientSetoran = ctx.createLinearGradient(0, 0, 0, 300);
                 gradientSetoran.addColorStop(0, 'rgba(16, 185, 129, 0.25)');
                 gradientSetoran.addColorStop(1, 'rgba(16, 185, 129, 0.00)');
 
-                // Gradien Warna Merah (Penarikan)
                 const gradientPenarikan = ctx.createLinearGradient(0, 0, 0, 300);
                 gradientPenarikan.addColorStop(0, 'rgba(239, 68, 68, 0.20)');
                 gradientPenarikan.addColorStop(1, 'rgba(239, 68, 68, 0.00)');
 
-                // Render Chart Premium
-                new Chart(ctx, {
+                if (window.myChartInstance) {
+                    window.myChartInstance.destroy();
+                }
+
+                window.myChartInstance = new Chart(ctx, {
                     type: 'line',
                     data: {
                         labels: data.grafik.labels,
@@ -250,12 +273,10 @@
                         responsive: true, 
                         maintainAspectRatio: false,
                         plugins: {
-                            legend: {
-                                display: false
-                            },
+                            legend: { display: false },
                             tooltip: {
                                 padding: 12,
-                                backgroundColor: 'rgba(15, 23, 42, 0.95)', // Memperbaiki sintaks error 'sizeof' sebelumnya
+                                backgroundColor: 'rgba(15, 23, 42, 0.95)',
                                 titleFont: { family: 'Plus Jakarta Sans', size: 12, weight: 'bold' },
                                 bodyFont: { family: 'Plus Jakarta Sans', size: 12 },
                                 cornerRadius: 12,
@@ -277,7 +298,20 @@
                 });
             }
         })
-        .catch(err => console.error("Gagal memuat data dashboard:", err));
-    });
+        .catch(err => {
+            console.error("Gagal memuat data dashboard:", err);
+            // Fallback text jika request gagal[cite: 2]
+            document.getElementById('stat-siswa').innerText = "-";
+            document.getElementById('stat-guru').innerText = "-";
+            document.getElementById('stat-tabungan').innerText = "-";
+            document.getElementById('stat-transaksi').innerText = "-";
+        })
+        .finally(() => {
+            if (btnRefresh) {
+                btnRefresh.disabled = false;
+                btnRefresh.innerHTML = `<i class="fa-solid fa-arrows-rotate mr-2"></i> Refresh Data`;
+            }
+        });
+    }
 </script>
 @endsection

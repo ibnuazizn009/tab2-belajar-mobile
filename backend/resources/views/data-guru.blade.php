@@ -26,6 +26,9 @@
             <h2 class="text-xl font-black text-slate-900 tracking-tight">Manajemen Guru</h2>
             <p class="text-xs text-slate-500 mt-1">Kelola data master profil guru dan tenaga pendidik sekolah.</p>
         </div>
+        <button id="btn-refresh-guru-data" onclick="muatDaftarGuru()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed shrink-0 self-start md:self-auto">
+            <i class="fa-solid fa-arrows-rotate mr-2"></i> Refresh Data
+        </button>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
@@ -124,7 +127,9 @@
                     </thead>
                     <tbody id="tabel-list-guru" class="text-xs divide-y divide-slate-50 font-medium text-slate-700">
                         <tr>
-                            <td colspan="4" class="py-6 text-center text-slate-400">Belum ada data guru.</td>
+                            <td colspan="4" class="py-8 text-center text-xs text-slate-400">
+                                <i class="fa-solid fa-spinner fa-spin mr-2"></i> Memuat data guru...
+                            </td>
                         </tr>
                     </tbody>
                 </table>
@@ -137,6 +142,8 @@
 
 @section('scripts')
 <script>
+
+    let sekolahId = null;
 
     document.addEventListener("DOMContentLoaded", function() {
         
@@ -164,35 +171,8 @@
         }
 
         const namaSekolah = localStorage.getItem('nama_sekolah') || 'Sekolah E-Tabungan';
-        const sekolahId = localStorage.getItem('sekolah_id');
+        sekolahId = localStorage.getItem('sekolah_id');
         document.getElementById('guru-nama-sekolah').value = namaSekolah;
-
-        function muatDaftarGuru() {
-            fetch(API_ROUTES.getDataGuru, { 
-                method: 'GET',
-                credentials: 'include',
-                headers: { 'Accept': 'application/json' }
-            })
-            .then(res => res.json())
-            .then(resJson => {
-                const tbody = document.getElementById('tabel-list-guru');
-                if (resJson && resJson.success && resJson.data.length > 0) {
-                    tbody.innerHTML = '';
-                    document.getElementById('total-badge-guru').innerText = `${resJson.data.length} Orang`;
-                    resJson.data.forEach(guru => {
-                        tbody.innerHTML += `
-                            <tr class="hover:bg-slate-50/50 transition">
-                                <td class="py-3 px-4 font-bold text-slate-400">${guru.nip || '-'}</td>
-                                <td class="py-3 px-4 font-bold text-slate-900">${guru.nama_guru}</td>
-                                <td class="py-3 px-4">${guru.jenis_kelamin || '-'}</td>
-                                <td class="py-3 px-4 text-slate-500">${guru.no_hp || '-'}</td>
-                            </tr>
-                        `;
-                    });
-                }
-            })
-            .catch(() => {});
-        }
 
         muatDaftarGuru();
 
@@ -284,5 +264,55 @@
             });
         });
     });
+
+    function muatDaftarGuru() {
+        const tbody = document.getElementById('tabel-list-guru');
+        const btnRefresh = document.getElementById('btn-refresh-guru-data');
+
+        // Set loading state pada tombol & tabel
+        btnRefresh.disabled = true;
+        btnRefresh.innerHTML = `<i class="fa-solid fa-arrows-rotate mr-2 fa-spin"></i> Memuat...`;
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="4" class="py-8 text-center text-xs text-slate-400">
+                    <i class="fa-solid fa-spinner fa-spin mr-2"></i> Memuat data guru...
+                </td>
+            </tr>
+        `;
+
+        fetch(API_ROUTES.getDataGuru, { 
+            method: 'GET',
+            credentials: 'include',
+            headers: { 'Accept': 'application/json' }
+        })
+        .then(res => res.json())
+        .then(resJson => {
+            if (resJson && resJson.success && resJson.data.length > 0) {
+                tbody.innerHTML = '';
+                document.getElementById('total-badge-guru').innerText = `${resJson.data.length} Orang`;
+                resJson.data.forEach(guru => {
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-slate-50/50 transition">
+                            <td class="py-3 px-4 font-bold text-slate-400">${guru.nip || '-'}</td>
+                            <td class="py-3 px-4 font-bold text-slate-900">${guru.nama_guru}</td>
+                            <td class="py-3 px-4">${guru.jenis_kelamin || '-'}</td>
+                            <td class="py-3 px-4 text-slate-500">${guru.no_hp || '-'}</td>
+                        </tr>
+                    `;
+                });
+            } else {
+                document.getElementById('total-badge-guru').innerText = `0 Orang`;
+                tbody.innerHTML = `<tr><td colspan="4" class="py-8 text-center text-slate-400">Belum ada data guru.</td></tr>`;
+            }
+        })
+        .catch(err => {
+            console.error("Gagal mengambil data guru:", err);
+            tbody.innerHTML = `<tr><td colspan="4" class="py-8 text-center text-red-500">Gagal memuat data dari server.</td></tr>`;
+        })
+        .finally(() => {
+            btnRefresh.disabled = false;
+            btnRefresh.innerHTML = `<i class="fa-solid fa-arrows-rotate mr-2"></i> Refresh Data`;
+        });
+    }
 </script>
 @endsection

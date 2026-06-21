@@ -19,6 +19,14 @@ class CheckRole
             ], 401);
         }
 
+        // Cek akun dinonaktifkan oleh Admin.
+        if (!$user->is_active) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Akun Anda telah dinonaktifkan. Silakan hubungi Admin.',
+            ], 403);
+        }
+
         // Cocokkan case-insensitive, supaya tidak gagal karena
         // perbedaan kapitalisasi antara route ('ADMIN_SEKOLAH')
         // dan nilai asli di database ('admin_sekolah')

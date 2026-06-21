@@ -29,4 +29,9 @@ class DataGuru extends Model
     {
         return $this->belongsTo(Sekolah::class, 'sekolah_id', 'id');
     }
+
+    public function loginUser()
+    {
+        return $this->belongsTo(LoginUser::class, 'login_user_id');
+    }
 }

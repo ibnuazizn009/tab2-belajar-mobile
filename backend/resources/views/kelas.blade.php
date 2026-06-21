@@ -26,7 +26,9 @@
             <h2 class="text-xl font-black text-slate-900 tracking-tight">Manajemen Kelas</h2>
             <p class="text-xs text-slate-500 mt-1">Kelola data kelas, tingkat, dan wali kelas untuk e-tabungan sekolah.</p>
         </div>
-        
+        <button id="btn-refresh-kelas" onclick="muatDaftarKelas()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed shrink-0 self-start md:self-auto">
+            <i class="fa-solid fa-arrows-rotate mr-2"></i> Refresh Data
+        </button>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
@@ -127,11 +129,8 @@
                     </thead>
                     <tbody id="tabel-list-kelas" class="text-xs divide-y divide-slate-50 font-medium text-slate-700">
                         <tr>
-                            <td colspan="4" class="py-8 text-center text-slate-400 font-medium">
-                                <div class="flex flex-col items-center gap-2">
-                                    <i class="fa-solid fa-folder-open text-xl text-slate-300"></i>
-                                    <span>Memuat daftar kelas sekolah...</span>
-                                </div>
+                            <td colspan="4" class="py-8 text-center text-xs text-slate-400">
+                                <i class="fa-solid fa-spinner fa-spin mr-2"></i> Memuat daftar kelas...
                             </td>
                         </tr>
                     </tbody>
@@ -147,6 +146,8 @@
 <script>
     // Ambil endpoint rute master kelas yang sudah ada di api.php Anda
     // Route::get("$prefix/master/kelas", [MasterController::class, 'getAllKelas']);
+
+    let sekolahId = null;
 
     document.addEventListener("DOMContentLoaded", function() {
         
@@ -174,91 +175,13 @@
         }
 
         const namaSekolah = localStorage.getItem('nama_sekolah') || 'Sekolah Aktif';
-        const sekolahId = localStorage.getItem('sekolah_id'); // Disimpan untuk payload API jika diperlukan
+        sekolahId = localStorage.getItem('sekolah_id'); // Disimpan untuk payload API jika diperlukan
 
         // Set nama sekolah ke input placeholder visual
         document.getElementById('input-nama-sekolah').value = namaSekolah;
 
-        function muatDaftarKelas() {
-            fetch(`${API_ROUTES.getKelas}?sekolah_id=${sekolahId}`, {
-                method: 'GET',
-                credentials: 'include',
-                headers: { 'Accept': 'application/json' }
-            })
-            .then(res => {
-                if (res.status === 401 || res.status === 403) {
-                    window.location.href = "/login";
-                    return;
-                }
-                return res.json();
-            })
-            .then(resJson => {
-                if (resJson && resJson.success) {
-                    const dataKelas = resJson.data; // Sesuaikan mapping struktur data API Anda
-                    const tbody = document.getElementById('tabel-list-kelas');
-                    document.getElementById('total-badge-kelas').innerText = `${dataKelas.length} Kelas`;
-                    
-                    if(dataKelas.length === 0) {
-                        tbody.innerHTML = `<tr><td colspan="4" class="py-8 text-center text-slate-400">Belum ada kelas terdaftar.</td></tr>`;
-                        return;
-                    }
-
-                    tbody.innerHTML = '';
-                    dataKelas.forEach((kelas, index) => {
-                        tbody.innerHTML += `
-                            <tr class="hover:bg-slate-50/50 transition">
-                                <td class="py-3 px-4 font-bold text-slate-400">${index + 1}</td>
-                                <td class="py-3 px-4 font-bold text-slate-900">${kelas.nama_kelas}</td>
-                                <td class="py-3 px-4"><span class="px-2 py-0.5 bg-blue-50 text-blue-600 font-bold rounded text-[10px]">${kelas.tingkat ? 'Tingkat ' + kelas.tingkat : '-'}</span></td>
-                                <td class="py-3 px-4 text-slate-500">${kelas.nama_guru ? kelas.nama_guru : '<span class="text-slate-300 italic">Belum Ditentukan</span>'}</td>
-                            </tr>
-                        `;
-                    });
-                }
-            })
-            .catch(err => {
-                console.error("Gagal mengambil data kelas:", err);
-                document.getElementById('tabel-list-kelas').innerHTML = `<tr><td colspan="4" class="py-8 text-center text-red-500">Gagal memuat data dari server.</td></tr>`;
-            });
-        }
-
         // Jalankan pemuatan otomatis saat halaman dibuka
         muatDaftarKelas();
-
-        function muatDaftarGuru() {
-            fetch(API_ROUTES.getDataGuru, {
-                method: 'GET',
-                credentials: 'include',
-                headers: { 'Accept': 'application/json' }
-            })
-            .then(res => {
-                if (res.status === 401 || res.status === 403) {
-                    window.location.href = "/login";
-                    return;
-                }
-                return res.json();
-            })
-            .then(resJson => {
-                if (resJson && resJson.success) {
-                    const dataGuru = resJson.data;
-                    const selectGuru = document.getElementById('guru_id');
-
-                    selectGuru.innerHTML = '<option value="">-- Pilih Wali Kelas (Opsional) --</option>';
-
-                    dataGuru.forEach(guru => {
-                        const opt = document.createElement('option');
-                        opt.value = guru.id;
-                        opt.innerText = guru.nama_guru;
-                        selectGuru.appendChild(opt);
-                    });
-                }
-            })
-            .catch(err => {
-                console.error("Gagal mengambil data guru:", err);
-            });
-        }
-
-
         muatDaftarGuru();
 
         document.getElementById('formKelas').addEventListener('submit', function(e) {
@@ -271,7 +194,6 @@
                 guru_id: document.getElementById('guru_id').value || null
             };
 
-            // Notifikasi loading instan
             Swal.fire({
                 title: 'Sedang Memproses...',
                 text: 'Menyimpan data kelas baru ke server.',
@@ -279,7 +201,6 @@
                 didOpen: () => { Swal.showLoading(); }
             });
 
-            // Ganti URL endpoint berikut sesuai rute backend penambahan kelas Anda nanti
             fetch(API_ROUTES.postKelas, { 
                 method: 'POST',
                 credentials: 'include',
@@ -299,12 +220,10 @@
                         confirmButtonColor: '#2563eb'
                     });
                     
-                    // Reset isi form input saja (Sekolah tetap aman)
                     document.getElementById('nama_kelas').value = '';
                     document.getElementById('tingkat').value = '';
                     document.getElementById('guru_id').value = '';
 
-                    // Refresh isi tabel otomatis
                     muatDaftarKelas();
                 } else {
                     Swal.fire({
@@ -328,5 +247,98 @@
         });
 
     });
+
+    function muatDaftarKelas() {
+        const tbody = document.getElementById('tabel-list-kelas');
+        const btnRefresh = document.getElementById('btn-refresh-kelas');
+
+        // Set loading state pada tombol & tabel
+        btnRefresh.disabled = true;
+        btnRefresh.innerHTML = `<i class="fa-solid fa-arrows-rotate mr-2 fa-spin"></i> Memuat...`;
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="4" class="py-8 text-center text-xs text-slate-400">
+                    <i class="fa-solid fa-spinner fa-spin mr-2"></i> Memuat daftar kelas...
+                </td>
+            </tr>
+        `;
+
+        fetch(`${API_ROUTES.getKelas}?sekolah_id=${sekolahId}`, {
+            method: 'GET',
+            credentials: 'include',
+            headers: { 'Accept': 'application/json' }
+        })
+        .then(res => {
+            if (res.status === 401 || res.status === 403) {
+                window.location.href = "/login";
+                return;
+            }
+            return res.json();
+        })
+        .then(resJson => {
+            if (resJson && resJson.success) {
+                const dataKelas = resJson.data; // Sesuaikan mapping struktur data API Anda
+                document.getElementById('total-badge-kelas').innerText = `${dataKelas.length} Kelas`;
+
+                if (dataKelas.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="4" class="py-8 text-center text-slate-400">Belum ada kelas terdaftar.</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = '';
+                dataKelas.forEach((kelas, index) => {
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-slate-50/50 transition">
+                            <td class="py-3 px-4 font-bold text-slate-400">${index + 1}</td>
+                            <td class="py-3 px-4 font-bold text-slate-900">${kelas.nama_kelas}</td>
+                            <td class="py-3 px-4"><span class="px-2 py-0.5 bg-blue-50 text-blue-600 font-bold rounded text-[10px]">${kelas.tingkat ? 'Tingkat ' + kelas.tingkat : '-'}</span></td>
+                            <td class="py-3 px-4 text-slate-500">${kelas.nama_guru ? kelas.nama_guru : '<span class="text-slate-300 italic">Belum Ditentukan</span>'}</td>
+                        </tr>
+                    `;
+                });
+            }
+        })
+        .catch(err => {
+            console.error("Gagal mengambil data kelas:", err);
+            tbody.innerHTML = `<tr><td colspan="4" class="py-8 text-center text-red-500">Gagal memuat data dari server.</td></tr>`;
+        })
+        .finally(() => {
+            btnRefresh.disabled = false;
+            btnRefresh.innerHTML = `<i class="fa-solid fa-arrows-rotate mr-2"></i> Refresh Data`;
+        });
+    }
+
+    function muatDaftarGuru() {
+        fetch(API_ROUTES.getDataGuru, {
+            method: 'GET',
+            credentials: 'include',
+            headers: { 'Accept': 'application/json' }
+        })
+        .then(res => {
+            if (res.status === 401 || res.status === 403) {
+                window.location.href = "/login";
+                return;
+            }
+            return res.json();
+        })
+        .then(resJson => {
+            if (resJson && resJson.success) {
+                const dataGuru = resJson.data;
+                const selectGuru = document.getElementById('guru_id');
+
+                selectGuru.innerHTML = '<option value="">-- Pilih Wali Kelas (Opsional) --</option>';
+
+                dataGuru.forEach(guru => {
+                    const opt = document.createElement('option');
+                    opt.value = guru.id;
+                    opt.innerText = guru.nama_guru;
+                    selectGuru.appendChild(opt);
+                });
+            }
+        })
+        .catch(err => {
+            console.error("Gagal mengambil data guru:", err);
+        });
+    }
 </script>
 @endsection

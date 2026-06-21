@@ -6,7 +6,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Tymon\JWTAuth\Exceptions\JWTException;
 use App\Models\LoginUser;
-use App\Models\Kelas; // 👈 1. Import model Kelas di bagian atas
+use App\Models\Kelas;
+use App\Models\DataGuru;
 use Carbon\Carbon;
 use App\Helpers\LicenseChecker;
 use Illuminate\Support\Facades\Cookie;
@@ -28,6 +29,22 @@ class AuthController extends Controller
 
             if (!$user || !Hash::check($request->password, $user->password)) {
                 return response()->json(['success' => false, 'message' => 'Username atau password salah.'], 401);
+            }
+
+            // 🔒 Cek akun dinonaktifkan oleh Admin
+            if (!$user->is_active) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Akun Anda telah dinonaktifkan. Silakan hubungi Admin Sekolah.'
+                ], 403);
+            }
+
+            // 🔒 Cek sedang login di device/browser lain (single-session enforcement)
+            if ($user->is_use) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Akun ini sedang digunakan di perangkat lain. Silakan logout terlebih dahulu sebelum login kembali.'
+                ], 409);
             }
 
             if ($user->role !== 'super_admin' && $user->sekolah) {
@@ -57,11 +74,18 @@ class AuthController extends Controller
                 return response()->json(['success' => false, 'message' => 'Gagal membuat token, coba lagi.'], 500);
             }
 
-            $kelas = Kelas::join('data_gurus', 'kelas.guru_id', '=', 'data_gurus.id')
-                    ->where('data_gurus.login_user_id', $user->id)
-                    ->where('kelas.sekolah_id', $user->sekolah_id)
-                    ->select('kelas.*')
-                    ->first();
+            // ✅ Token berhasil dibuat -> tandai akun sedang digunakan
+            $user->is_use = true;
+            $user->save();
+
+            $dataGuru = DataGuru::where('login_user_id', $user->id)->first();
+
+
+            $daftarKelas = $dataGuru
+                ? Kelas::where('guru_id', $dataGuru->id)
+                    ->where('sekolah_id', $user->sekolah_id)
+                    ->get(['id', 'nama_kelas', 'tingkat'])
+                : collect();
 
             $statusAkun = LicenseChecker::checkStatus($user->sekolah);
 
@@ -94,7 +118,8 @@ class AuthController extends Controller
                     'sekolah_id'   => (int) $user->sekolah_id,
                     'nama_sekolah' => $user->sekolah ? $user->sekolah->nama_sekolah : 'Super Admin Panel',
                     'role'         => $user->role,
-                    'kelas_id'     => $kelas ? $kelas->id : null,
+                    'guru_id'         => $dataGuru ? $dataGuru->id : null,
+                    'kelas_id'        => $daftarKelas->first()->id ?? null,
                     'sekolah'      => $user->sekolah,
                     'paket_layanan'   => $user->sekolah ? $user->sekolah->paket_layanan : 'free',
                     'status_akun'     => $statusAkun,
@@ -138,27 +163,41 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
+        $authUser = auth('api')->user();
+
+        if ($authUser) {
+            $loginUser = LoginUser::find($authUser->id);
+
+            if ($loginUser) {
+                $loginUser->is_use = false;
+                $loginUser->save();
+            }
+        }
+
         try {
             auth('api')->logout();
         } catch (\Exception $e) {
             // Tetap lanjut jika token ternyata sudah kadaluwarsa duluan
         }
 
-        // 2. Cek apakah request datang dari Web Browser (AJAX/Fetch)
-        if ($request->wantsJson() || $request->ajax()) {
-            // JALUR WEB: Hapus Cookie 'token_jwt' di browser
-            $cookie = Cookie::forget('token_jwt');
+        // Deteksi platform konsisten dengan endpoint lain — pakai header
+        // X-Client-Platform, bukan wantsJson()/ajax() yang ambigu karena
+        // mobile juga selalu kirim Accept: application/json.
+        $isMobile = $request->header('X-Client-Platform') === 'mobile';
 
+        if ($isMobile) {
+            // JALUR MOBILE: Kembalikan JSON murni saja (tanpa cookie)
             return response()->json([
                 'success' => true,
-                'message' => 'Berhasil keluar dari sistem Web.'
-            ])->withCookie($cookie);
+                'message' => 'Berhasil keluar dari sistem Mobile.'
+            ]);
         }
 
-        // 3. JALUR MOBILE: Kembalikan JSON murni saja (tanpa cookie)
+        $cookie = Cookie::forget('token_jwt');
+
         return response()->json([
             'success' => true,
-            'message' => 'Berhasil keluar dari sistem Mobile.'
-        ]);
+            'message' => 'Berhasil keluar dari sistem Web.'
+        ])->withCookie($cookie);
     }
 }

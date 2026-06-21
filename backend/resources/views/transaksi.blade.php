@@ -7,7 +7,7 @@
         <h2 class="text-xl font-black text-slate-900">Log Transaksi Global</h2>
         <p class="text-xs text-slate-500">Mutasi tabungan real-time dari seluruh siswa.</p>
     </div>
-    <button onclick="window.location.reload()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold rounded-xl transition">
+    <button id="btn-refresh-transaksi" onclick="loadDaftarTransaksi()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed">
         <i class="fa-solid fa-arrows-rotate mr-2"></i> Refresh Data
     </button>
 </div>
@@ -36,42 +36,72 @@
 </div>
 
 <script>
-    const tokenJwt = localStorage.getItem('token_jwt');
+    function formatWaktu(isoString) {
+        const d = new Date(isoString);
+        const tanggal = d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+        const jam = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+        return `${tanggal}, ${jam}`;
+    }
 
     function loadDaftarTransaksi() {
-        fetch('/api/services/tab2one/admin/transaksi', {
+        const tbody = document.getElementById('table-transaksi-body');
+        const btnRefresh = document.getElementById('btn-refresh-transaksi');
+
+        // Set loading state pada tombol & tabel
+        btnRefresh.disabled = true;
+        btnRefresh.innerHTML = `<i class="fa-solid fa-arrows-rotate mr-2 fa-spin"></i> Memuat...`;
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="p-8 text-center text-xs text-slate-400">
+                    <i class="fa-solid fa-spinner fa-spin mr-2"></i> Memuat data transaksi...
+                </td>
+            </tr>
+        `;
+
+        fetch(API_ROUTES.getTransaksi, {
             method: 'GET',
-            headers: { 
-                'Authorization': 'Bearer ' + tokenJwt,
-                'Accept': 'application/json' 
+            credentials: 'include',
+            headers: {
+                'Accept': 'application/json'
             }
         })
         .then(res => res.json())
         .then(data => {
-            const tbody = document.getElementById('table-transaksi-body');
-            
-            if (data.success && data.transaksi.length > 0) {
-                tbody.innerHTML = data.transaksi.map(t => `
-                    <tr>
-                        <td class="p-4 text-xs text-slate-500">${t.waktu}</td>
-                        <td class="p-4 font-semibold text-slate-800">${t.nama_siswa}</td>
-                        <td class="p-4 text-xs">${t.nama_petugas}</td>
-                        <td class="p-4">
-                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${t.jenis === 'SETOR' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}">
-                                ${t.jenis}
-                            </span>
-                        </td>
-                        <td class="p-4 text-right font-bold ${t.jenis === 'SETOR' ? 'text-emerald-600' : 'text-red-600'}">
-                            ${t.jenis === 'SETOR' ? '+' : '-'} Rp ${t.nominal.toLocaleString('id-ID')}
-                        </td>
-                    </tr>
-                `).join('');
+            if (data.success && data.data.length > 0) {
+                tbody.innerHTML = data.data.map(t => {
+                    const isSetor = t.tipe === 'setor';
+                    const namaKelas = t.siswa?.kelas?.nama_kelas ?? '-';
+
+                    return `
+                        <tr>
+                            <td class="p-4 text-xs text-slate-500">${formatWaktu(t.created_at)}</td>
+                            <td class="p-4">
+                                <p class="font-semibold text-slate-800">${t.siswa?.nama_siswa ?? '-'}</p>
+                                <p class="text-[11px] text-slate-400">Kelas ${namaKelas}</p>
+                            </td>
+                            <td class="p-4 text-xs">${t.petugas?.nama_guru ?? '-'}</td>
+                            <td class="p-4">
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${isSetor ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}">
+                                    ${t.tipe}
+                                </span>
+                            </td>
+                            <td class="p-4 text-right font-bold ${isSetor ? 'text-emerald-600' : 'text-red-600'}">
+                                ${isSetor ? '+' : '-'} Rp ${t.nominal.toLocaleString('id-ID')}
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
             } else {
                 tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-xs text-slate-400">Belum ada transaksi.</td></tr>`;
             }
         })
         .catch(err => {
-            document.getElementById('table-transaksi-body').innerHTML = `<tr><td colspan="5" class="p-8 text-center text-xs text-red-400">Gagal memuat data.</td></tr>`;
+            console.error(err);
+            tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-xs text-red-400">Gagal memuat data.</td></tr>`;
+        })
+        .finally(() => {
+            btnRefresh.disabled = false;
+            btnRefresh.innerHTML = `<i class="fa-solid fa-arrows-rotate mr-2"></i> Refresh Data`;
         });
     }
 

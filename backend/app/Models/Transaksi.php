@@ -12,11 +12,11 @@ class Transaksi extends Model
     const UPDATED_AT = null;
 
     protected $fillable = [
-        'siswa_id',   
-        'user_id',    
-        'tipe',     
+        'siswa_id',
+        'user_id',
+        'tipe',
         'nominal',
-        'saldo_awal',  
+        'saldo_awal',
         'saldo_akhir',
         'keterangan',
     ];
@@ -38,10 +38,11 @@ class Transaksi extends Model
     }
 
     /**
-     * Relasi ke petugas/guru yang menginput transaksi ini
+     * Relasi ke data guru (petugas) yang menginput transaksi ini
+     * Sekarang merujuk ke data_gurus, bukan login_users
      */
     public function petugas(): BelongsTo
     {
-        return $this->belongsTo(LoginUser::class, 'user_id', 'id');
+        return $this->belongsTo(DataGuru::class, 'user_id', 'id');
     }
 }

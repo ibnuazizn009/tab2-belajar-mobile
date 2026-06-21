@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Storage;
 use App\Models\LoginUser;
 use App\Models\Kelas;
 use App\Models\DataGuru;
+use App\Models\Transaksi;
 
 class AdminSekolahController extends Controller
 {
@@ -277,7 +278,7 @@ class AdminSekolahController extends Controller
 
             $guru = LoginUser::where('sekolah_id', $sekolahId)
                 ->where('role', 'guru')
-                ->select('id', 'nama_lengkap', 'username', 'password')
+                ->select('id', 'nama_lengkap', 'username', 'password', 'is_active', 'is_use')
                 ->get();
 
             return response()->json([
@@ -448,5 +449,111 @@ class AdminSekolahController extends Controller
                 'message' => 'Gagal menyimpan data: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    public function getAllTransaksi(Request $request)
+    {
+        try {
+            $sekolahId = auth('api')->user()->sekolah_id ?? null;
+
+            if (!$sekolahId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Sesi admin telah berakhir, silakan login kembali.'
+                ], 401);
+            }
+
+            $transaksi = Transaksi::with([
+                    'siswa:id,nama_siswa,kelas_id,sekolah_id',
+                    'siswa.kelas:id,nama_kelas',
+                    'petugas:id,nama_guru'
+                ])
+                ->whereHas('siswa', function ($q) use ($sekolahId) {
+                    $q->where('sekolah_id', $sekolahId);
+                })
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Berhasil mengambil data transaksi sekolah Anda',
+                'data'    => $transaksi
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengambil data transaksi: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function resetStatusAkunGuru(Request $request, $id)
+    {
+        $admin = auth('api')->user();
+
+        $loginUser = LoginUser::where('id', $id)
+            ->where('sekolah_id', $admin->sekolah_id)
+            ->whereHas('dataGuru')
+            ->first();
+
+        if (!$loginUser) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akun guru tidak ditemukan atau bukan milik sekolah Anda.'
+            ], 404);
+        }
+
+        $loginUser->is_active = !$loginUser->is_active;
+
+        if (!$loginUser->is_active) {
+            $loginUser->is_use = false;
+        }
+
+        $loginUser->save();
+
+        $namaGuru = $loginUser->dataGuru->nama_guru ?? $loginUser->username;
+
+        return response()->json([
+            'success' => true,
+            'message' => $loginUser->is_active
+                ? "Akun {$namaGuru} berhasil diaktifkan."
+                : "Akun {$namaGuru} berhasil dinonaktifkan.",
+            'is_active' => $loginUser->is_active,
+        ]);
+    }
+
+    public function resetSesiGuru($id)
+    {
+        $admin = auth('api')->user();
+
+        $loginUser = LoginUser::where('id', $id)
+            ->where('sekolah_id', $admin->sekolah_id)
+            ->whereHas('dataGuru')
+            ->first();
+
+        if (!$loginUser) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akun guru tidak ditemukan atau bukan milik sekolah Anda.'
+            ], 404);
+        }
+
+        if (!$loginUser->is_use) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akun ini sedang tidak dalam status login (sesi sudah tidak aktif).'
+            ], 422);
+        }
+
+        $loginUser->is_use = false;
+        $loginUser->save();
+
+        $namaGuru = $loginUser->dataGuru->nama_lengkap ?? $loginUser->username;
+
+        return response()->json([
+            'success' => true,
+            'message' => "Sesi login {$namaGuru} berhasil di-reset. Guru bisa login kembali dari device manapun.",
+        ]);
     }
 }

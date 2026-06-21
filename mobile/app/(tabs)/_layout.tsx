@@ -68,7 +68,17 @@ export default function TabLayout() {
     }
   };
 
-  triggerLogoutGlobal = () => {
+  triggerLogoutGlobal = async () => {
+    try {
+      await tab2ApiService.postNonMessage(
+        `${process.env.EXPO_PUBLIC_API_URL}/auth/logout`,
+        {},
+        'logout'
+      );
+    } catch (error) {
+      console.log('Logout API gagal, lanjut cleanup lokal:', error);
+    }
+  
     tab2Toast.info(
       'Sampai Jumpa!',
       'Anda berhasil keluar dari aplikasi.',
@@ -135,6 +145,7 @@ export default function TabLayout() {
       if (responseData && responseData.success && responseData.data) {
         
         const apiData = responseData.data;
+
         console.log(apiData);
         await Promise.all([
           SecureStore.setItemAsync('access_token', apiData.access_token),

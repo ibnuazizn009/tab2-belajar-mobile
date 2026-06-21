@@ -115,7 +115,8 @@ export const tab2ApiService = {
           : {
               'Content-Type': 'application/json',
               Accept: 'application/json',
-              Authorization: `Bearer ${accessToken}`
+              Authorization: `Bearer ${accessToken}`,
+              'X-Client-Platform': 'mobile'
             },
         body: isFormData ? data : JSON.stringify(data)
       })
@@ -190,7 +191,8 @@ export const tab2ApiService = {
         headers: {
           'Content-Type': 'application/json',
           Accept: 'application/json',
-          Authorization: `Bearer ${accessToken}`
+          Authorization: `Bearer ${accessToken}`,
+          'X-Client-Platform': 'mobile'
         }
       })
 
@@ -231,7 +233,8 @@ export const tab2ApiService = {
         headers: {
           'Content-Type': 'application/json',
           Accept: 'application/json',
-          Authorization: `Bearer ${accessToken}`
+          Authorization: `Bearer ${accessToken}`,
+          'X-Client-Platform': 'mobile'
         },
         body: JSON.stringify(data)
       })
@@ -270,7 +273,8 @@ export const tab2ApiService = {
         headers: {
           'Content-Type': 'application/json',
           Accept: 'application/json',
-          Authorization: `Bearer ${accessToken}`
+          Authorization: `Bearer ${accessToken}`,
+          'X-Client-Platform': 'mobile'
         }
       })
 
@@ -304,6 +308,7 @@ export const tab2ApiService = {
         headers: {
           'Content-Type': 'application/json',
           Accept: 'application/json',
+          'X-Client-Platform': 'mobile'
           // Authorization: `Bearer ${accessToken}`
         }
       })
@@ -335,7 +340,8 @@ export const tab2ApiService = {
       const response = await axios.post(url, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'X-Client-Platform': 'mobile'
         }
       });
       return response.data;

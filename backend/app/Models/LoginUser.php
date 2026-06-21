@@ -41,6 +41,12 @@ class LoginUser extends Authenticatable implements JWTSubject
         return $this->hasMany(Kelas::class, 'guru_id', 'id');
     }
 
+    public function dataGuru()
+    {
+        return $this->hasOne(DataGuru::class, 'login_user_id');
+    }
+
+
     /**
      * Get the identifier that will be stored in the subject claim of the JWT.
      */
