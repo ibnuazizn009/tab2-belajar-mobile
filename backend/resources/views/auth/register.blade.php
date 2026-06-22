@@ -237,7 +237,11 @@
                                     <i class="fa-solid fa-lock text-sm"></i>
                                 </div>
                                 <input type="password" id="password" name="password" required placeholder="Minimal 6 karakter" 
-                                    class="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition duration-200 text-sm shadow-sm">
+                                    class="w-full pl-10 pr-11 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition duration-200 text-sm shadow-sm">
+                                <button type="button" id="toggle-password" tabindex="-1"
+                                    class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-blue-600 transition duration-150">
+                                    <i class="fa-solid fa-eye text-sm" id="icon-toggle-password"></i>
+                                </button>
                             </div>
                             <p class="text-[11px] text-red-500 font-medium mt-1 hidden global-error-msg" id="err-password">⚠️ Password belum diisi</p>
                         </div>
@@ -260,12 +264,24 @@
     <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 
     <script>
-        // 1. Inisialisasi Searchable Dropdown Kota (Tom Select)
+
         const selectKota = new TomSelect("#searchable-kota",{
             create: false,
             placeholder: "-- Pilih Kota / Kabupaten --",
             allowEmptyOption: false,
             sortField: { field: "text", direction: "asc" }
+        });
+
+        // Toggle Show/Hide Password
+        const togglePasswordBtn = document.getElementById('toggle-password');
+        const passwordInput = document.getElementById('password');
+        const iconTogglePassword = document.getElementById('icon-toggle-password');
+
+        togglePasswordBtn.addEventListener('click', function() {
+            const isPassword = passwordInput.type === 'password';
+            passwordInput.type = isPassword ? 'text' : 'password';
+            iconTogglePassword.classList.toggle('fa-eye');
+            iconTogglePassword.classList.toggle('fa-eye-slash');
         });
 
         // 2. Logika Validasi Front-End & Pengiriman Ajax (Fetch)
