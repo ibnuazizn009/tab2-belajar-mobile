@@ -69,7 +69,7 @@ class AuthController extends Controller
 
             try {
                 if (!$token = auth('api')->login($user)) {
-                    return response()->json(['success' => false, 'message' => 'Username atau password salah.'], 401);
+                    return response()->json(['success' => false, 'message' => 'Username atau password salah..'], 401);
                 }
             } catch (JWTException $e) {
                 return response()->json(['success' => false, 'message' => 'Gagal membuat token, coba lagi.'], 500);
