@@ -21,6 +21,7 @@ $prefix = 'services/tab2one';
 Route::post("$prefix/auth/login", [AuthController::class, 'login']);
 
 Route::post("$prefix/auth/register-sekolah", [SuperAdminController::class, 'registerSekolahBaru']);
+Route::post("$prefix/xendit/callback", [SuperAdminController::class, 'handleXenditCallback']);
 
 // Data Master Umum (Digunakan saat pendaftaran sekolah baru di website)
 Route::get("$prefix/master/kota", [MasterController::class, 'getAllKota']);
