@@ -21,7 +21,8 @@ class Sekolah extends Model
         'status',    
         'alamat',
         'kota_id',
-        'is_premium',         
+        'is_premium',
+        'paket_layanan',         
         'premium_expires_at',
     ];
 

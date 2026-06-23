@@ -161,6 +161,8 @@ class SuperAdminController extends Controller
 
     public function handleXenditCallback(Request $request)
     {
+        Log::info('=== CALLBACK XENDIT MASUK ===', $request->all());
+
         // 1. Validasi Keamanan Token
         $xenditXCallbackToken = $request->header('x-callback-token');
         if ($xenditXCallbackToken !== config('services.xendit.callback_token')) {
@@ -173,7 +175,7 @@ class SuperAdminController extends Controller
         $data = $request->all();
         $externalId  = $data['external_id']; 
         $status      = $data['status'];     
-        $description = $data['description'] ?? ''; // Ambil deskripsi dari Xendit
+        $description = $data['description'] ?? '';
 
         // 2. Jika statusnya PAID atau SETTLED, lakukan update
         if ($status === 'PAID' || $status === 'SETTLED') {
@@ -188,12 +190,12 @@ class SuperAdminController extends Controller
                 if ($sekolah) {
                     
                     // 🌟 LOGIKA BARU: Deteksi paket berdasarkan teks di description
-                    $paketLayanan = 'BRONZE'; // default jika tidak cocok
+                    $paketLayanan = 'BRONZE'; 
                     
-                    if (str_contains(strtolower($description), 'SILVER')) {
+                    if (str_contains(strtolower($description), 'silver')) {
                         $paketLayanan = 'SILVER';
-                    } elseif (str_contains(strtolower($description), 'GOLD')) {
-                        $paketLayanan = 'GOLD';
+                    } elseif (str_contains(strtolower($description), 'gold')) {
+                        $paketLayanan = 'GOLDEN'; 
                     }
 
                     // Update data sekolah di database
