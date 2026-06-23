@@ -161,26 +161,24 @@ class SuperAdminController extends Controller
 
     public function handleXenditCallback(Request $request)
     {
-        // 1. Validasi Keamanan: Pastikan request benar-benar datang dari Xendit
+        // 1. Validasi Keamanan Token
         $xenditXCallbackToken = $request->header('x-callback-token');
-
         if ($xenditXCallbackToken !== config('services.xendit.callback_token')) {
             return response()->json([
                 'status'  => 'error',
-                'message' => 'Token callback tidak valid / Ilegal!'
+                'message' => 'Token callback tidak valid!'
             ], 403);
         }
 
-        // 2. Ambil data payload dari Xendit
         $data = $request->all();
-        
-        $externalId = $data['external_id']; 
-        $status     = $data['status'];     
+        $externalId  = $data['external_id']; 
+        $status      = $data['status'];     
+        $description = $data['description'] ?? ''; // Ambil deskripsi dari Xendit
 
-        // 3. Jika statusnya PAID atau SETTLED, update database Sekolah
+        // 2. Jika statusnya PAID atau SETTLED, lakukan update
         if ($status === 'PAID' || $status === 'SETTLED') {
             
-            // Pecah external_id untuk mengambil ID Sekolah (REG-{id_sekolah}-{time})
+            // Pecah external_id untuk mengambil ID Sekolah
             $parts = explode('-', $externalId);
             $sekolahId = $parts[1] ?? null;
 
@@ -188,15 +186,26 @@ class SuperAdminController extends Controller
                 $sekolah = Sekolah::find($sekolahId);
 
                 if ($sekolah) {
-                    // Set premium aktif dan hitung mundur 30 hari
+                    
+                    // 🌟 LOGIKA BARU: Deteksi paket berdasarkan teks di description
+                    $paketLayanan = 'BRONZE'; // default jika tidak cocok
+                    
+                    if (str_contains(strtolower($description), 'SILVER')) {
+                        $paketLayanan = 'SILVER';
+                    } elseif (str_contains(strtolower($description), 'GOLD')) {
+                        $paketLayanan = 'GOLD';
+                    }
+
+                    // Update data sekolah di database
                     $sekolah->update([
                         'is_premium'         => 1,
                         'premium_expires_at' => Carbon::now()->addDays(30),
+                        'paket_layanan'      => $paketLayanan,
                     ]);
 
                     return response()->json([
                         'status'  => 'success',
-                        'message' => 'Database Sekolah berhasil diperbarui menjadi Aktif/Premium!'
+                        'message' => "Database Sekolah ID {$sekolahId} berhasil diperbarui ke paket {$paketLayanan}!"
                     ], 200);
                 }
             }
