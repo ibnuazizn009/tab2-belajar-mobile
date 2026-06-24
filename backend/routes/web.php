@@ -39,6 +39,9 @@ Route::post('/register', [SuperAdminController::class, 'registerSekolahBaru'])->
 Route::get('/download-app', function () {
     return view('download-app');
 });
+Route::get('/payment/failed', function () {
+    return view('payment-failed');
+})->name('payment.failed');
 
 Route::get('/test-no-auth', function () {
     return 'Halaman ini berhasil diakses tanpa redirect';

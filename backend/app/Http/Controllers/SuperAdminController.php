@@ -91,8 +91,44 @@ class SuperAdminController extends Controller
                 'role'         => 'admin_sekolah',
             ]);
 
+            // // =================================================================
+            // // 🌟 AWAL LOGIKA INTEGRASI XENDIT PAYMENT GATEWAY
+            // // =================================================================
+            // $redirectUrl = null;
+            // $harga = 0;
+
+            // if ($request->paket_layanan === 'SILVER') {
+            //     $harga = 150000;
+            // } elseif ($request->paket_layanan === 'GOLDEN') {
+            //     $harga = 350000;
+            // }
+
+            // // Jika memilih paket berbayar, buatkan invoice di Xendit
+            // if ($harga > 0) {
+            //     // Inisialisasi API Key dari file .env
+            //     Configuration::setXenditKey(config('services.xendit.secret_key'));
+            //     $apiInstance = new InvoiceApi();
+
+            //     $createInvoiceRequest = new CreateInvoiceRequest([
+            //         'external_id' => 'REG-' . $sekolah->id . '-' . time(),
+            //         'amount' => $harga,
+            //         'payer_email' => $request->email_sekolah, 
+            //         'description' => 'Aktivasi Layanan E-Tabungan Paket ' . $request->paket_layanan . ' - ' . $sekolah->nama_sekolah,
+            //         'success_redirect_url' => route('login'), // Arahkan kembali ke login setelah sukses bayar
+            //     ]);
+
+            //     // Kirim request ke server Xendit
+            //     $invoice = $apiInstance->createInvoice($createInvoiceRequest);
+                
+            //     // Ambil link pembayaran aman dari Xendit
+            //     $redirectUrl = $invoice['invoice_url'];
+            // }
+            // // =================================================================
+            // // 🌟 AKHIR LOGIKA INTEGRASI XENDIT
+            // // =================================================================
+
             // =================================================================
-            // 🌟 AWAL LOGIKA INTEGRASI XENDIT PAYMENT GATEWAY
+            // 🌟 AWAL LOGIKA INTEGRASI MIDTRANS PAYMENT GATEWAY
             // =================================================================
             $redirectUrl = null;
             $harga = 0;
@@ -103,28 +139,44 @@ class SuperAdminController extends Controller
                 $harga = 350000;
             }
 
-            // Jika memilih paket berbayar, buatkan invoice di Xendit
+            // Jika memilih paket berbayar, buatkan invoice/transaksi di Midtrans
             if ($harga > 0) {
-                // Inisialisasi API Key dari file .env
-                Configuration::setXenditKey(config('services.xendit.secret_key'));
-                $apiInstance = new InvoiceApi();
+                // Konfigurasi Kunci Midtrans
+                \Midtrans\Config::$serverKey = config('services.midtrans.server_key');
+                \Midtrans\Config::$isProduction = config('services.midtrans.is_production', false);
+                \Midtrans\Config::$isSanitized = true;
+                \Midtrans\Config::$is3ds = true;
 
-                $createInvoiceRequest = new CreateInvoiceRequest([
-                    'external_id' => 'REG-' . $sekolah->id . '-' . time(),
-                    'amount' => $harga,
-                    'payer_email' => $request->email_sekolah, 
-                    'description' => 'Aktivasi Layanan E-Tabungan Paket ' . $request->paket_layanan . ' - ' . $sekolah->nama_sekolah,
-                    'success_redirect_url' => route('login'), // Arahkan kembali ke login setelah sukses bayar
-                ]);
+                $params = [
+                    'transaction_details' => [
+                        'order_id'     => 'REG-' . $sekolah->id . '-' . time(),
+                        'gross_amount' => $harga,
+                    ],
+                    'callbacks' => [
+                        'finish' => 'http://192.168.18.127:8000/login', //'https://domain-anda.com/login', 
+                        'error'  => 'http://192.168.18.127:8000/payment/failed',
+                    ],
+                    'customer_details' => [
+                        'first_name' => $request->nama_lengkap,
+                        'email'      => $request->email_sekolah,
+                        'phone'      => $request->no_whatsapp,
+                    ],
+                    'item_details' => [
+                        [
+                            'id'       => $request->paket_layanan,
+                            'price'    => $harga,
+                            'quantity' => 1,
+                            'name'     => 'Paket ' . $request->paket_layanan . ' - ' . $sekolah->nama_sekolah,
+                        ]
+                    ]
+                ];
 
-                // Kirim request ke server Xendit
-                $invoice = $apiInstance->createInvoice($createInvoiceRequest);
-                
-                // Ambil link pembayaran aman dari Xendit
-                $redirectUrl = $invoice['invoice_url'];
+                // Request ke Midtrans untuk membuat link pembayaran (Snap URL)
+                $snapResponse = \Midtrans\Snap::createTransaction($params);
+                $redirectUrl  = $snapResponse->redirect_url;
             }
             // =================================================================
-            // 🌟 AKHIR LOGIKA INTEGRASI XENDIT
+            // 🌟 AKHIR LOGIKA INTEGRASI MIDTRANS
             // =================================================================
 
             DB::commit();
@@ -161,8 +213,6 @@ class SuperAdminController extends Controller
 
     public function handleXenditCallback(Request $request)
     {
-        Log::info('=== CALLBACK XENDIT MASUK ===', $request->all());
-
         // 1. Validasi Keamanan Token
         $xenditXCallbackToken = $request->header('x-callback-token');
         if ($xenditXCallbackToken !== config('services.xendit.callback_token')) {
@@ -209,6 +259,58 @@ class SuperAdminController extends Controller
                         'status'  => 'success',
                         'message' => "Database Sekolah ID {$sekolahId} berhasil diperbarui ke paket {$paketLayanan}!"
                     ], 200);
+                }
+            }
+        }
+
+        return response()->json(['status' => 'ignored'], 200);
+    }
+
+    public function handleMidtransCallback(Request $request)
+    {
+        $serverKey = config('services.midtrans.server_key');
+        
+        // 1. Validasi Keamanan Signature Key dari Midtrans
+        $hashed = hash("sha512", $request->order_id . $request->status_code . $request->gross_amount . $serverKey);
+        if ($hashed !== $request->signature_key) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Signature key tidak valid!'
+            ], 403);
+        }
+
+        $transactionStatus = $request->transaction_status;
+        $fraudStatus       = $request->fraud_status;
+        $orderId           = $request->order_id;
+
+        // Pecah order_id untuk mengambil ID Sekolah
+        $parts = explode('-', $orderId);
+        $sekolahId = $parts[1] ?? null;
+
+        if ($sekolahId) {
+            $sekolah = Sekolah::find($sekolahId);
+
+            if ($sekolah) {
+                // 2. Jika Pembayaran Berhasil (Settlement atau Capture Accept)
+                if ($transactionStatus == 'settlement' || ($transactionStatus == 'capture' && $fraudStatus == 'accept')) {
+                    
+                    $sekolah->update([
+                        'is_premium'         => 1,
+                        'premium_expires_at' => Carbon::now()->addDays(30),
+                        // paket_layanan tidak perlu diubah karena sudah benar saat disimpan di register awal
+                    ]);
+
+                    return response()->json(['status' => 'success', 'message' => 'Pembayaran berhasil diverifikasi.'], 200);
+                
+                // 3. Jika Pembayaran Dibatalkan / Kedaluwarsa
+                } elseif (in_array($transactionStatus, ['cancel', 'deny', 'expire'])) {
+                    
+                    $sekolah->update([
+                        'is_premium'    => 0,
+                        'paket_layanan' => 'BRONZE'
+                    ]);
+
+                    return response()->json(['status' => 'success', 'message' => 'Transaksi gagal atau kedaluwarsa.'], 200);
                 }
             }
         }
