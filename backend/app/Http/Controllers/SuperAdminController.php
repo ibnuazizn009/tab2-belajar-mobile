@@ -35,7 +35,7 @@ class SuperAdminController extends Controller
     public function registerSekolahBaru(Request $request)
     {
         try {
-            // Validasi input
+            // Validasi input tetap sama
             $request->validate([
                 'npsn'          => 'required|string|size:8|unique:sekolah,npsn',
                 'nama_sekolah'  => 'required|string|max:255',
@@ -52,12 +52,21 @@ class SuperAdminController extends Controller
                 'password'      => 'required|string|min:6',
             ]);
 
+            $pendaftaran = $this->prosesSimpanKeDatabase($request->all());
+
+            if ($pendaftaran['status'] === 'error') {
+                return response()->json($pendaftaran, 500);
+            }
+
+            $sekolah = $pendaftaran['sekolah'];
             $harga = ($request->paket_layanan === 'SILVER') ? 150000 : (($request->paket_layanan === 'GOLDEN') ? 350000 : 0);
 
+            // TAHAP B: Jika memilih paket berbayar, buatkan link Midtrans
             if ($harga > 0) {
                 Config::$serverKey = config('services.midtrans.server_key');
                 Config::$isProduction = config('services.midtrans.is_production', false);
-                $orderId = 'REG-' . time() . '-' . strtolower($request->nama_sekolah);
+                
+                $orderId = 'REG-' . $sekolah->id . '-' . time();
 
                 $params = [
                     'transaction_details' => [
@@ -84,13 +93,20 @@ class SuperAdminController extends Controller
                 ];
 
                 $snapResponse = Snap::createTransaction($params);
+                
                 return response()->json([
-                    'status' => 'success', 
-                    'message' => 'Pendaftaran berhasil! Mengalihkan Anda ke halaman pembayaran MidTrans...',
-                    'redirect_url' => $snapResponse->redirect_url], 201);
+                    'status'       => 'success', 
+                    'message'      => 'Pendaftaran berhasil! Mengalihkan Anda ke halaman pembayaran MidTrans...',
+                    'redirect_url' => $snapResponse->redirect_url
+                ], 201);
             }
 
-            return $this->prosesSimpanKeDatabase($request->all());
+            // Jika paket BRONZE (Gratis), langsung return sukses tanpa link Midtrans
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Pendaftaran sekolah paket BRONZE berhasil!',
+                'data'    => $pendaftaran['data']
+            ], 201);
 
         } catch (\Exception $e) {
             Log::error('Gagal Registrasi: ' . $e->getMessage());
@@ -346,20 +362,29 @@ class SuperAdminController extends Controller
                 return response()->json(['message' => 'Unauthorized'], 403);
             }
 
-            if ($request->transaction_status == 'settlement' || $request->transaction_status == 'capture') {
-                $transaction = \Midtrans\Transaction::status($request->order_id);
-                if (!is_object($transaction)) {
-                    throw new \Exception('Transaction is not an object');
-                }
-                
-                $data = json_decode(json_encode($transaction->customer_details), true);
-                if (!is_object($transaction)) {
-                    throw new \Exception('Transaction is not an object');
-                };
+            $orderParts = explode('-', $request->order_id);
+            $sekolahId = $orderParts[1] ?? null;
 
-                $this->prosesSimpanKeDatabase($data);
-            }elseif (in_array($request->transaction_status, ['expire', 'cancel', 'deny'])) {
-                return response()->json(['status' => `Transaksi Midtrans {$request->transaction_status}: order_id={$request->order_id}`]);
+            $sekolah = Sekolah::find($sekolahId);
+            if (!$sekolah) {
+                return response()->json(['status' => 'error', 'message' => 'Data sekolah tidak ditemukan'], 404);
+            }
+
+            if ($request->transaction_status == 'settlement' || $request->transaction_status == 'capture') {
+                $sekolah->update([
+                    'status_pembayaran'  => 'SUKSES',
+                    'is_premium'         => 1, // Aktifkan premium
+                    'premium_expires_at' => Carbon::now()->addDays(30) // Masa aktif berjalan sejak sukses bayar
+                ]);
+                
+                Log::info("Pembayaran SUKSES untuk Sekolah: {$sekolah->nama_sekolah} (ID: {$sekolahId})");
+
+            } elseif (in_array($request->transaction_status, ['expire', 'cancel', 'deny'])) {
+                $sekolah->update([
+                    'status_pembayaran' => 'GAGAL'
+                ]);
+
+                Log::info("Pembayaran GAGAL/EXPIRED untuk Sekolah: {$sekolah->nama_sekolah} (ID: {$sekolahId})");
             }
 
             return response()->json(['status' => 'success']);
@@ -426,9 +451,13 @@ class SuperAdminController extends Controller
     {
         try {
             return DB::transaction(function () use ($data) {
-                $isPremium = ($data['paket_layanan'] === 'BRONZE') ? 0 : 1;
-                $durasi = ($data['paket_layanan'] === 'BRONZE') ? 7 : 30;
-                $expiresAt = Carbon::now()->addDays($durasi);
+                // Tentukan status awal & masa aktif
+                $isBronze = ($data['paket_layanan'] === 'BRONZE');
+                
+                $statusPembayaran = $isBronze ? 'SUKSES' : 'PENDING';
+                $isPremium        = $isBronze ? 0 : 0; 
+                $durasi           = $isBronze ? 7 : 30;
+                $expiresAt        = Carbon::now()->addDays($durasi);
 
                 $sekolah = Sekolah::create([
                     'npsn'               => $data['npsn'],
@@ -441,6 +470,7 @@ class SuperAdminController extends Controller
                     'is_premium'         => $isPremium,
                     'paket_layanan'      => $data['paket_layanan'],
                     'premium_expires_at' => $expiresAt,
+                    'status_pembayaran'  => $statusPembayaran, 
                 ]);
 
                 LoginUser::create([
@@ -452,10 +482,9 @@ class SuperAdminController extends Controller
                     'role'         => 'admin_sekolah',
                 ]);
 
-                // 🌟 Mengembalikan data yang diminta saja
                 return [
                     'status'  => 'success',
-                    'message' => 'Pendaftaran sekolah & akun admin berhasil.',
+                    'sekolah' => $sekolah, 
                     'data'    => [
                         'nama_sekolah'   => $sekolah->nama_sekolah,
                         'is_premium'     => $sekolah->is_premium,
@@ -468,6 +497,7 @@ class SuperAdminController extends Controller
             return [
                 'status'  => 'error',
                 'message' => 'Gagal menyimpan data ke sistem.',
+                'sekolah' => null,
                 'data'    => null
             ];
         }
