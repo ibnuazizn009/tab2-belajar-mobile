@@ -95,8 +95,23 @@
                                 </select>
                             </div>
                             <div id="benefit_box" class="mt-3 p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 space-y-1.5 transition-all duration-300"></div>
+                            <div id="sandbox_banner" class="mt-3 p-4 bg-blue-50 border-l-4 border-blue-500 rounded-r-lg shadow-sm hidden">
+                                <h3 class="text-blue-800 font-bold text-sm">
+                                    <i class="fa-solid fa-flask-vial mr-2"></i>Panduan Testing (Sandbox Mode)
+                                </h3>
+                                <p class="text-blue-600 text-xs mt-2 leading-relaxed">
+                                    Karena aplikasi ini sedang dalam mode <b>Sandbox (Uji Coba)</b>, Anda tidak perlu membayar dengan uang asli.
+                                    Setelah diarahkan ke halaman pembayaran Midtrans, gunakan simulator resmi berikut untuk menyelesaikan transaksi:
+                                </p>
+                                <a href="https://simulator.sandbox.midtrans.com/" target="_blank"
+                                class="inline-block mt-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg text-xs transition">
+                                    <i class="fa-solid fa-arrow-up-right-from-square mr-1"></i> Buka Midtrans Simulator
+                                </a>
+                                <p class="text-[10px] text-blue-400 mt-3 italic">
+                                    * Salin nomor Virtual Account (atau metode pembayaran lain) yang muncul di halaman Midtrans, lalu gunakan di simulator tersebut untuk menyelesaikan pembayaran uji coba.
+                                </p>
+                            </div>
                         </div>
-
                         <div>
                             <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">NPSN Sekolah (8 Digit) <span class="text-red-500">*</span></label>
                             <div class="relative">
@@ -446,6 +461,8 @@
         function updateBenefit() {
             const paket = document.getElementById('paket_layanan').value;
             const box = document.getElementById('benefit_box');
+            const sandboxBanner = document.getElementById('sandbox_banner');
+
             let htmlContent = '';
             
             if (paket === 'BRONZE') {
@@ -467,6 +484,7 @@
                     <p>• Maksimal 150 Input Transaksi / Hari</p>
                     <p>• WhatsApp Notifikasi ke Orang Tua</p>
                 `;
+                sandboxBanner.classList.remove('hidden');
             } else if (paket === 'GOLDEN') {
                 box.className = "mt-3 p-4 bg-emerald-50/60 border border-emerald-100 rounded-xl text-xs text-slate-700 space-y-1";
                 htmlContent = `
@@ -478,6 +496,7 @@
                     <p>• Download Rekap Buku Tabungan (PDF/Excel)</p>
                     <p>• Import Excel Saldo Awal Siswa</p>
                 `;
+                sandboxBanner.classList.remove('hidden');
             }
             box.innerHTML = htmlContent;
         }

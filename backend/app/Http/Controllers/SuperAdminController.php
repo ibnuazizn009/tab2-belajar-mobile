@@ -13,6 +13,9 @@ use Carbon\Carbon;
 use Xendit\Configuration;
 use Xendit\Invoice\InvoiceApi;
 use Xendit\Invoice\CreateInvoiceRequest;
+use Midtrans\Config;
+use Midtrans\Snap;
+use Midtrans\Transaction;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Log;
 
@@ -30,6 +33,72 @@ class SuperAdminController extends Controller
     }
 
     public function registerSekolahBaru(Request $request)
+    {
+        try {
+            // Validasi input
+            $request->validate([
+                'npsn'          => 'required|string|size:8|unique:sekolah,npsn',
+                'nama_sekolah'  => 'required|string|max:255',
+                'email_sekolah' => 'required|email|max:255',
+                'jenjang_id'    => 'required|numeric', 
+                'status'        => 'required|in:NEGERI,SWASTA',
+                'alamat'        => 'nullable|string',
+                'kota_id'       => 'required|numeric', 
+                'paket_layanan' => 'required|in:BRONZE,SILVER,GOLDEN', 
+                
+                'nama_lengkap'  => 'required|string|max:255',
+                'no_whatsapp'   => 'required|string|max:20',
+                'username'      => 'required|string|min:4|unique:login_users,username',
+                'password'      => 'required|string|min:6',
+            ]);
+
+            $harga = ($request->paket_layanan === 'SILVER') ? 150000 : (($request->paket_layanan === 'GOLDEN') ? 350000 : 0);
+
+            if ($harga > 0) {
+                Config::$serverKey = config('services.midtrans.server_key');
+                Config::$isProduction = config('services.midtrans.is_production', false);
+                $orderId = 'REG-' . time() . '-' . strtolower($request->nama_sekolah);
+
+                $params = [
+                    'transaction_details' => [
+                        'order_id'     => $orderId,
+                        'gross_amount' => $harga,
+                    ],
+                    'customer_details' => [
+                        'first_name' => $request->nama_lengkap,
+                        'email'      => $request->email_sekolah,
+                        'phone'      => $request->no_whatsapp,
+                    ],
+                    'callbacks' => [
+                        'finish' => 'http://192.168.18.127:8000/login',
+                        'error'  => 'http://192.168.18.127:8000/payment/payment-failed',
+                    ],
+                    'item_details' => [
+                        [
+                            'id'       => $request->paket_layanan,
+                            'price'    => $harga,
+                            'quantity' => 1,
+                            'name'     => 'Paket ' . $request->paket_layanan,
+                        ],
+                    ],
+                ];
+
+                $snapResponse = Snap::createTransaction($params);
+                return response()->json([
+                    'status' => 'success', 
+                    'message' => 'Pendaftaran berhasil! Mengalihkan Anda ke halaman pembayaran MidTrans...',
+                    'redirect_url' => $snapResponse->redirect_url], 201);
+            }
+
+            return $this->prosesSimpanKeDatabase($request->all());
+
+        } catch (\Exception $e) {
+            Log::error('Gagal Registrasi: ' . $e->getMessage());
+            return response()->json(['status' => 'error', 'message' => 'Sistem gagal memproses pendaftaran.'], 500);
+        }
+    }
+
+    public function registerSekolahBaruOld(Request $request)
     {
         try {
             $request->validate([
@@ -266,7 +335,42 @@ class SuperAdminController extends Controller
         return response()->json(['status' => 'ignored'], 200);
     }
 
+    
     public function handleMidtransCallback(Request $request)
+    {
+        try {
+            $serverKey = config('services.midtrans.server_key');
+            $hashed = hash("sha512", $request->order_id . $request->status_code . $request->gross_amount . $serverKey);
+
+            if ($hashed !== $request->signature_key) {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+
+            if ($request->transaction_status == 'settlement' || $request->transaction_status == 'capture') {
+                $transaction = \Midtrans\Transaction::status($request->order_id);
+                if (!is_object($transaction)) {
+                    throw new \Exception('Transaction is not an object');
+                }
+                
+                $data = json_decode(json_encode($transaction->customer_details), true);
+                if (!is_object($transaction)) {
+                    throw new \Exception('Transaction is not an object');
+                };
+
+                $this->prosesSimpanKeDatabase($data);
+            }elseif (in_array($request->transaction_status, ['expire', 'cancel', 'deny'])) {
+                return response()->json(['status' => `Transaksi Midtrans {$request->transaction_status}: order_id={$request->order_id}`]);
+            }
+
+            return response()->json(['status' => 'success']);
+
+        } catch (\Exception $e) {
+            Log::error('Error saat callback Midtrans: ' . $e->getMessage());
+            return response()->json(['status' => 'error', 'message' => 'Gagal memproses callback'], 500);
+        }
+    }
+    
+    public function handleMidtransCallbackOld(Request $request)
     {
         $serverKey = config('services.midtrans.server_key');
         
@@ -316,5 +420,56 @@ class SuperAdminController extends Controller
         }
 
         return response()->json(['status' => 'ignored'], 200);
+    }
+
+    private function prosesSimpanKeDatabase($data)
+    {
+        try {
+            return DB::transaction(function () use ($data) {
+                $isPremium = ($data['paket_layanan'] === 'BRONZE') ? 0 : 1;
+                $durasi = ($data['paket_layanan'] === 'BRONZE') ? 7 : 30;
+                $expiresAt = Carbon::now()->addDays($durasi);
+
+                $sekolah = Sekolah::create([
+                    'npsn'               => $data['npsn'],
+                    'nama_sekolah'       => strtoupper($data['nama_sekolah']),
+                    'email_sekolah'      => strtolower($data['email_sekolah']),
+                    'jenjang_id'         => $data['jenjang_id'],
+                    'status'             => $data['status'],
+                    'alamat'             => $data['alamat'],
+                    'kota_id'            => $data['kota_id'],
+                    'is_premium'         => $isPremium,
+                    'paket_layanan'      => $data['paket_layanan'],
+                    'premium_expires_at' => $expiresAt,
+                ]);
+
+                LoginUser::create([
+                    'sekolah_id'   => $sekolah->id,
+                    'username'     => strtolower($data['username']),
+                    'password'     => Hash::make($data['password']),
+                    'nama_lengkap' => $data['nama_lengkap'],
+                    'no_whatsapp'  => $data['no_whatsapp'],
+                    'role'         => 'admin_sekolah',
+                ]);
+
+                // 🌟 Mengembalikan data yang diminta saja
+                return [
+                    'status'  => 'success',
+                    'message' => 'Pendaftaran sekolah & akun admin berhasil.',
+                    'data'    => [
+                        'nama_sekolah'   => $sekolah->nama_sekolah,
+                        'is_premium'     => $sekolah->is_premium,
+                        'berlaku_sampai' => $sekolah->premium_expires_at->format('Y-m-d')
+                    ]
+                ];
+            });
+        } catch (\Exception $e) {
+            Log::error('Gagal simpan ke DB: ' . $e->getMessage());
+            return [
+                'status'  => 'error',
+                'message' => 'Gagal menyimpan data ke sistem.',
+                'data'    => null
+            ];
+        }
     }
 }
