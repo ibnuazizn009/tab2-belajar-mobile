@@ -24,6 +24,7 @@ class Sekolah extends Model
         'is_premium',
         'paket_layanan',         
         'premium_expires_at',
+        'status_pembayaran',
     ];
 
     protected $casts = [
