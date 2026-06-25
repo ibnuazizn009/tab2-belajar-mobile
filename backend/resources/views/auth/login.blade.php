@@ -177,6 +177,22 @@
                     localStorage.setItem('sisa_hari_paket', data.user.sisa_hari_paket);
                     localStorage.setItem('foto_profil', data.user.foto_url);
 
+                    let redirectUrl = "/dashboard-admin";
+                    let alertIcon = "success";
+                    let alertTitle = "Berhasil!";
+                    let alertText = "Login sukses, mengalihkan...";
+
+                    if (data.user.role === 'admin_sekolah' && data.user.sekolah) {
+                        let statusBayar = data.user.sekolah.status_pembayaran;
+                        
+                        if (statusBayar === 'PENDING' || statusBayar === 'GAGAL') {
+                            redirectUrl = "/payment/retry"; // ──► Alihkan ke route khusus generate token ulang Anda
+                            alertIcon = "warning";
+                            alertTitle = "Pembayaran Tertunda!";
+                            alertText = "Pembayaran pendaftaran belum selesai. Mengalihkan Anda ke halaman pembayaran...";
+                        }
+                    }
+                    
                     Swal.fire({
                         icon: 'success', 
                         title: 'Berhasil!',
