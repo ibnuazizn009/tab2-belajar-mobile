@@ -79,8 +79,8 @@ class SuperAdminController extends Controller
                         'phone'      => $request->no_whatsapp,
                     ],
                     'callbacks' => [
-                        'finish' => 'http://192.168.18.127:8000/login',
-                        'error'  => 'http://192.168.18.127:8000/payment/payment-failed',
+                        'finish' => 'https://etabungan-tab2one.hopto.org/login', //'http://192.168.18.127:8000/login',
+                        'error'  => 'https://etabungan-tab2one.hopto.org/payment/payment-failed' //'http://192.168.18.127:8000/payment/payment-failed',
                     ],
                     'item_details' => [
                         [
