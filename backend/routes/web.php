@@ -43,6 +43,9 @@ Route::get('/payment/payment-failed', function () {
     return view('payment.payment-failed');
 })->name('payment.failed');
 
+Route::get('/payment/retry', [SuperAdminController::class, 'showRetryPage'])->name('payment.payment-retry');
+Route::post('/payment/retry', [SuperAdminController::class, 'processRetryPayment']);
+
 Route::get('/test-no-auth', function () {
     return 'Halaman ini berhasil diakses tanpa redirect';
 });

@@ -51,19 +51,25 @@ class AuthController extends Controller
             if ($user->role !== 'super_admin' && $user->sekolah) {
                 $sekolah = $user->sekolah;
             
-                // Cek apakah masa premium sudah kedaluwarsa
-                $isExpired = $sekolah->premium_expires_at && Carbon::now('Asia/Jakarta')->greaterThan($sekolah->premium_expires_at);
-                $notActive = !$sekolah->premium_expires_at && !$sekolah->is_premium;
-            
-                if ($isExpired || $notActive) {
+                if (in_array($sekolah->status_pembayaran, ['PENDING', 'GAGAL'])) {
                     if ($user->role !== 'admin_sekolah') {
                         return response()->json([
-                            'status'  => 'frozen',
-                            'message' => 'Masa aktif layanan sekolah Anda telah berakhir. Silakan hubungi Admin Sekolah untuk perpanjangan.'
+                            'success' => false,
+                            'message' => 'Pendaftaran sekolah belum selesai atau pembayaran tertunda. Silakan hubungi Admin Sekolah.'
                         ], 403);
                     }
-                    
-                    // 💡 JIKA DIA ADALAH ADMIN SEKOLAH, JANGAN DI-BLOKIR (Biarkan lolos ke dashboard)
+                }else {
+                    $isExpired = $sekolah->premium_expires_at && Carbon::now('Asia/Jakarta')->greaterThan($sekolah->premium_expires_at);
+                    $notActive = !$sekolah->premium_expires_at && !$sekolah->is_premium;
+                
+                    if ($isExpired || $notActive) {
+                        if ($user->role !== 'admin_sekolah') {
+                            return response()->json([
+                                'success' => false, 
+                                'message' => 'Masa aktif layanan sekolah Anda telah berakhir. Silakan hubungi Admin Sekolah untuk perpanjangan.'
+                            ], 403);
+                        }
+                    }
                 }
             }
 

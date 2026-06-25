@@ -32,6 +32,84 @@ class SuperAdminController extends Controller
         return view('auth.register', compact('jenjangs', 'kotas', 'paket_terpilih'));
     }
 
+    public function showRetryPage()
+    {
+        $user = auth()->user() ?? auth('api')->user(); 
+        
+        if (!$user || $user->role !== 'admin_sekolah') {
+            return redirect('/login');
+        }
+
+        $sekolah = $user->sekolah;
+        
+        if (!$sekolah || !in_array($sekolah->status_pembayaran, ['PENDING', 'GAGAL'])) {
+            return redirect('/dashboard-admin');
+        }
+
+        return view('payment.payment-retry', compact('sekolah', 'user'));
+    }
+
+    public function processRetryPayment(Request $request)
+    {
+        try {
+            $user = auth()->user() ?? auth('api')->user();
+            if (!$user) {
+                return response()->json(['status' => 'error', 'message' => 'Sesi Anda telah habis, silakan login kembali.'], 401);
+            }
+
+            $sekolah = $user->sekolah;
+            if (!$sekolah) {
+                return response()->json(['status' => 'error', 'message' => 'Data sekolah tidak ditemukan.'], 404);
+            }
+
+            $harga = ($sekolah->paket_layanan === 'SILVER') ? 150000 : (($sekolah->paket_layanan === 'GOLDEN') ? 350000 : 0);
+
+            if ($harga > 0) {
+                Config::$serverKey = config('services.midtrans.server_key');
+                Config::$isProduction = config('services.midtrans.is_production', false);
+                
+                $orderId = 'REG-' . $sekolah->id . '-' . time();
+
+                $params = [
+                    'transaction_details' => [
+                        'order_id'     => $orderId,
+                        'gross_amount' => $harga,
+                    ],
+                    'customer_details' => [
+                        'first_name' => $user->nama_lengkap,
+                        'email'      => $sekolah->email_sekolah,
+                        'phone'      => $user->no_whatsapp,
+                    ],
+                    'callbacks' => [
+                        'finish' => 'http://192.168.18.127:8000/login',
+                        'error'  => 'http://192.168.18.127:8000/payment/payment-failed',
+                    ],
+                    'item_details' => [
+                        [
+                            'id'       => $sekolah->paket_layanan,
+                            'price'    => $harga,
+                            'quantity' => 1,
+                            'name'     => 'Paket ' . $sekolah->paket_layanan,
+                        ],
+                    ],
+                ];
+
+                $snapResponse = Snap::createTransaction($params);
+                
+                return response()->json([
+                    'status'       => 'success', 
+                    'redirect_url' => $snapResponse->redirect_url
+                ]);
+            }
+
+            return response()->json(['status' => 'error', 'message' => 'Paket layanan gratis tidak membutuhkan pembayaran ulang.'], 400);
+
+        } catch (\Exception $e) {
+            Log::error('Gagal Regenerasi Pembayaran: ' . $e->getMessage());
+            return response()->json(['status' => 'error', 'message' => 'Sistem gagal membuat ulang tautan pembayaran.'], 500);
+        }
+    }
+
     public function registerSekolahBaru(Request $request)
     {
         try {
