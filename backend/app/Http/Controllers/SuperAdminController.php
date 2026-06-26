@@ -61,6 +61,17 @@ class SuperAdminController extends Controller
         return view('payment.payment-retry', compact('sekolah', 'token'));
     }
 
+    public function showVerifyingPage(Request $request)
+    {
+        $orderId = $request->query('order_id');
+    
+        if (!$orderId) {
+            return redirect('/login');
+        }
+    
+        return view('payment.payment-verifying', compact('orderId'));
+    }
+
     public function processRetryPayment(Request $request)
     {
         try {
@@ -105,7 +116,7 @@ class SuperAdminController extends Controller
                         'phone'      => $admin->no_whatsapp,
                     ],
                     'callbacks' => [
-                        'finish' => 'https://etabungan-tab2one.hopto.org/login', //'http://192.168.18.127:8000/login',
+                        'finish' => 'https://etabungan-tab2one.hopto.org/payment/verifying?order_id=' . $orderId, //'http://192.168.18.127:8000/login',
                         'error'  => 'https://etabungan-tab2one.hopto.org/payment/failed', //'http://192.168.18.127:8000/payment/payment-failed',
                     ],
                     'item_details' => [
@@ -189,7 +200,7 @@ class SuperAdminController extends Controller
                         'phone'      => $request->no_whatsapp,
                     ],
                     'callbacks' => [
-                        'finish' => 'https://etabungan-tab2one.hopto.org/login', //'http://192.168.18.127:8000/login',
+                        'finish' => 'https://etabungan-tab2one.hopto.org/payment/verifying?order_id=' . $orderId, //'http://192.168.18.127:8000/login',
                         'error'  => 'https://etabungan-tab2one.hopto.org/payment/failed', //'http://192.168.18.127:8000/payment/payment-failed',
                     ],
                     'item_details' => [
@@ -611,5 +622,30 @@ class SuperAdminController extends Controller
                 'data'    => null
             ];
         }
+    }
+
+    public function checkPaymentStatus(Request $request)
+    {
+        $orderId = $request->query('order_id');
+    
+        if (!$orderId) {
+            return response()->json(['status' => 'error', 'message' => 'order_id tidak ada.'], 400);
+        }
+    
+        // order_id formatnya REG-{sekolah_id}-{timestamp}
+        $orderParts = explode('-', $orderId);
+        $sekolahId = $orderParts[1] ?? null;
+    
+        $sekolah = Sekolah::find($sekolahId);
+    
+        if (!$sekolah) {
+            return response()->json(['status' => 'error', 'message' => 'Data tidak ditemukan.'], 404);
+        }
+    
+        return response()->json([
+            'status'            => 'success',
+            'status_pembayaran' => $sekolah->status_pembayaran, // PENDING | SUKSES | GAGAL
+            'nama_sekolah'      => $sekolah->nama_sekolah,
+        ]);
     }
 }

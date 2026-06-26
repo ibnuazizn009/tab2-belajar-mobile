@@ -23,6 +23,7 @@ Route::post("$prefix/auth/login", [AuthController::class, 'login']);
 Route::post("$prefix/auth/register-sekolah", [SuperAdminController::class, 'registerSekolahBaru']);
 Route::post("$prefix/xendit/callback", [SuperAdminController::class, 'handleXenditCallback']);
 Route::post("$prefix/midtrans/callback", [SuperAdminController::class, 'handleMidtransCallback']);
+Route::get("$prefix/payment/status", [SuperAdminController::class, 'checkPaymentStatus']);
 
 // Data Master Umum (Digunakan saat pendaftaran sekolah baru di website)
 Route::get("$prefix/master/kota", [MasterController::class, 'getAllKota']);
