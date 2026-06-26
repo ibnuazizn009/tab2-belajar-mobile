@@ -93,8 +93,12 @@ class AuthController extends Controller
                 return response()->json(['success' => false, 'message' => 'Gagal membuat token, coba lagi.'], 500);
             }
 
-            $user->is_use = true;
-            $user->save();
+            $sedangRetryPayment = $user->sekolah && in_array($user->sekolah->status_pembayaran, ['PENDING', 'GAGAL']);
+ 
+            if (!$sedangRetryPayment) {
+                $user->is_use = true;
+                $user->save();
+            }
 
             $dataGuru = DataGuru::where('login_user_id', $user->id)->first();
 
