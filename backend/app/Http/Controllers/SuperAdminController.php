@@ -32,57 +32,81 @@ class SuperAdminController extends Controller
         return view('auth.register', compact('jenjangs', 'kotas', 'paket_terpilih'));
     }
 
-    public function showRetryPage()
+    public function showRetryPage(Request $request)
     {
-        $user = auth()->user() ?? auth('api')->user(); 
-        
-        if (!$user || $user->role !== 'admin_sekolah') {
-            return redirect('/login');
+        $token = $request->query('token');
+
+        if (!$token) {
+            return redirect('/login')->with('error', 'Token tidak ada di URL.');
         }
 
-        $sekolah = $user->sekolah;
-        
-        if (!$sekolah || !in_array($sekolah->status_pembayaran, ['PENDING', 'GAGAL'])) {
-            return redirect('/dashboard-admin');
+        $sekolah = Sekolah::where('retry_token', $token)->first(); // sementara hapus filter expired
+
+        Log::info('DEBUG retry token', [
+            'token_dicari' => $token,
+            'sekolah_ketemu' => $sekolah ? $sekolah->id : null,
+            'status_pembayaran' => $sekolah ? $sekolah->status_pembayaran : null,
+            'retry_token_expires_at' => $sekolah ? $sekolah->retry_token_expires_at : null,
+            'now' => now(),
+        ]);
+
+        if (!$sekolah) {
+            return redirect('/login')->with('error', 'Sekolah tidak ditemukan dari token.');
         }
 
-        return view('payment.payment-retry', compact('sekolah', 'user'));
+        if (!in_array($sekolah->status_pembayaran, ['PENDING', 'GAGAL'])) {
+            return redirect('/login')->with('error', 'Status pembayaran bukan PENDING/GAGAL: ' . $sekolah->status_pembayaran);
+        }
+
+        return view('payment.payment-retry', compact('sekolah', 'token'));
     }
 
     public function processRetryPayment(Request $request)
     {
         try {
-            $user = auth()->user() ?? auth('api')->user();
-            if (!$user) {
-                return response()->json(['status' => 'error', 'message' => 'Sesi Anda telah habis, silakan login kembali.'], 401);
+            $token = $request->input('token');
+    
+            if (!$token) {
+                return response()->json(['status' => 'error', 'message' => 'Tautan tidak valid.'], 401);
             }
-
-            $sekolah = $user->sekolah;
+    
+            $sekolah = Sekolah::where('retry_token', $token)
+                ->where('retry_token_expires_at', '>', now())
+                ->first();
+    
             if (!$sekolah) {
-                return response()->json(['status' => 'error', 'message' => 'Data sekolah tidak ditemukan.'], 404);
+                return response()->json(['status' => 'error', 'message' => 'Tautan sudah tidak berlaku, silakan login kembali.'], 401);
             }
-
+    
+            $admin = LoginUser::where('sekolah_id', $sekolah->id)
+                ->where('role', 'admin_sekolah')
+                ->first();
+    
+            if (!$admin) {
+                return response()->json(['status' => 'error', 'message' => 'Data admin sekolah tidak ditemukan.'], 404);
+            }
+    
             $harga = ($sekolah->paket_layanan === 'SILVER') ? 150000 : (($sekolah->paket_layanan === 'GOLDEN') ? 350000 : 0);
-
+    
             if ($harga > 0) {
                 Config::$serverKey = config('services.midtrans.server_key');
                 Config::$isProduction = config('services.midtrans.is_production', false);
-                
+    
                 $orderId = 'REG-' . $sekolah->id . '-' . time();
-
+    
                 $params = [
                     'transaction_details' => [
                         'order_id'     => $orderId,
                         'gross_amount' => $harga,
                     ],
                     'customer_details' => [
-                        'first_name' => $user->nama_lengkap,
+                        'first_name' => $admin->nama_lengkap,
                         'email'      => $sekolah->email_sekolah,
-                        'phone'      => $user->no_whatsapp,
+                        'phone'      => $admin->no_whatsapp,
                     ],
                     'callbacks' => [
-                        'finish' => 'http://192.168.18.127:8000/login',
-                        'error'  => 'http://192.168.18.127:8000/payment/payment-failed',
+                        'finish' => 'https://etabungan-tab2one.hopto.org/login', //'http://192.168.18.127:8000/login',
+                        'error'  => 'https://etabungan-tab2one.hopto.org/payment/failed', //'http://192.168.18.127:8000/payment/payment-failed',
                     ],
                     'item_details' => [
                         [
@@ -93,17 +117,25 @@ class SuperAdminController extends Controller
                         ],
                     ],
                 ];
-
+    
                 $snapResponse = Snap::createTransaction($params);
-                
+    
+                // Token sudah terpakai untuk generate transaksi baru -> hapus supaya
+                // benar-benar sekali-pakai. Kalau customer balik lagi nanti, mereka
+                // harus login ulang untuk dapat token baru.
+                $sekolah->update([
+                    'retry_token'            => null,
+                    'retry_token_expires_at' => null,
+                ]);
+    
                 return response()->json([
-                    'status'       => 'success', 
+                    'status'       => 'success',
                     'redirect_url' => $snapResponse->redirect_url
                 ]);
             }
-
+    
             return response()->json(['status' => 'error', 'message' => 'Paket layanan gratis tidak membutuhkan pembayaran ulang.'], 400);
-
+    
         } catch (\Exception $e) {
             Log::error('Gagal Regenerasi Pembayaran: ' . $e->getMessage());
             return response()->json(['status' => 'error', 'message' => 'Sistem gagal membuat ulang tautan pembayaran.'], 500);
@@ -158,7 +190,7 @@ class SuperAdminController extends Controller
                     ],
                     'callbacks' => [
                         'finish' => 'https://etabungan-tab2one.hopto.org/login', //'http://192.168.18.127:8000/login',
-                        'error'  => 'https://etabungan-tab2one.hopto.org/payment/payment-failed' //'http://192.168.18.127:8000/payment/payment-failed',
+                        'error'  => 'https://etabungan-tab2one.hopto.org/payment/failed', //'http://192.168.18.127:8000/payment/payment-failed',
                     ],
                     'item_details' => [
                         [

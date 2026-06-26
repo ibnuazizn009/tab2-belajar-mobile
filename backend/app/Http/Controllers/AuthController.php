@@ -12,6 +12,7 @@ use App\Models\Kelas;
 use App\Models\DataGuru;
 use Carbon\Carbon;
 use App\Helpers\LicenseChecker;
+use Illuminate\Support\Facades\Log;
 
 class AuthController extends Controller
 {
@@ -50,7 +51,7 @@ class AuthController extends Controller
 
             if ($user->role !== 'super_admin' && $user->sekolah) {
                 $sekolah = $user->sekolah;
-            
+
                 if (in_array($sekolah->status_pembayaran, ['PENDING', 'GAGAL'])) {
                     if ($user->role !== 'admin_sekolah') {
                         return response()->json([
@@ -71,6 +72,17 @@ class AuthController extends Controller
                         }
                     }
                 }
+            }
+
+            $retryToken = null;
+ 
+            if ($user->role === 'admin_sekolah' && $user->sekolah && in_array($user->sekolah->status_pembayaran, ['PENDING', 'GAGAL'])) {
+                $retryToken = bin2hex(random_bytes(32));
+            
+                $user->sekolah->update([
+                    'retry_token'            => $retryToken,
+                    'retry_token_expires_at' => Carbon::now('Asia/Jakarta')->addMinutes(15),
+                ]);
             }
 
             try {
@@ -128,6 +140,8 @@ class AuthController extends Controller
                     'kelas_id'        => $daftarKelas->first()->id ?? null,
                     'sekolah'      => $user->sekolah,
                     'paket_layanan'   => $user->sekolah ? $user->sekolah->paket_layanan : 'BRONZE',
+                    'status_pembayaran' => $user->sekolah ? $user->sekolah->status_pembayaran : 'SUKSES',
+                    'retry_token'       => $retryToken, 
                     'status_akun'     => $statusAkun,
                     'sisa_hari_paket' => $sisaHariPaket,
                     'expired_at'      => $user->sekolah ? $user->sekolah->premium_expires_at : null,

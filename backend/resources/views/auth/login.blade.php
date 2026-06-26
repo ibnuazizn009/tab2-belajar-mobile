@@ -184,14 +184,14 @@
 
                     if (data.user.role === 'admin_sekolah' && data.user.sekolah) {
                         let statusBayar = data.user.sekolah.status_pembayaran;
-                        
-                        if (statusBayar === 'PENDING' || statusBayar === 'GAGAL') {
-                            redirectUrl = "/payment/retry"; // ──► Alihkan ke route khusus generate token ulang Anda
+                        if ((statusBayar === 'PENDING' || statusBayar === 'GAGAL') && data.user.retry_token) {
+                            redirectUrl = "/payment/retry?token=" + data.user.retry_token;
                             alertIcon = "warning";
                             alertTitle = "Pembayaran Tertunda!";
                             alertText = "Pembayaran pendaftaran belum selesai. Mengalihkan Anda ke halaman pembayaran...";
                         }
                     }
+
                     
                     Swal.fire({
                         icon: 'success', 
@@ -206,7 +206,7 @@
                         }
                     });
                     
-                    setTimeout(() => { window.location.href = "/dashboard-admin"; }, 1500);
+                    setTimeout(() => { window.location.href = redirectUrl; }, 1500);
                 } else {
                     Swal.fire({
                         icon: 'error', 

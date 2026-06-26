@@ -33,7 +33,7 @@
             <div class="flex justify-between border-t border-slate-200/60 pt-3">
                 <span class="text-slate-500 font-semibold">Total Tagihan:</span>
                 <span class="font-extrabold text-blue-600 text-base">
-                    Rp {{ number_with_delimiter($sekolah->paket_layanan === 'SILVER' ? 150000 : 350000) }}
+                    Rp {{ number_format($sekolah->paket_layanan === 'SILVER' ? 150000 : 350000, 0, ',', '.') }}
                 </span>
             </div>
         </div>
@@ -57,19 +57,18 @@
         const btnIcon = document.getElementById('btn-icon');
 
         btnPay.addEventListener('click', function() {
-            // Ubah tombol ke state Loading
             btnPay.disabled = true;
             btnText.innerText = 'Menyiapkan Gerbang Pembayaran...';
             btnIcon.className = 'fa-solid fa-spinner fa-spin';
-
-            // Tembak POST request ke rute pembayaran ulang
+        
             fetch('/payment/retry', {
                 method: 'POST',
                 headers: {
                     'X-CSRF-TOKEN': '{{ csrf_token() }}',
                     'Accept': 'application/json',
                     'Content-Type': 'application/json'
-                }
+                },
+                body: JSON.stringify({ token: '{{ $token }}' }) // 🌟 baris baru
             })
             .then(response => response.json())
             .then(data => {
@@ -82,8 +81,7 @@
                         showConfirmButton: false,
                         customClass: { popup: 'max-w-[400px] w-[90%] text-sm' }
                     });
-
-                    // Alihkan user ke link pembayaran baru dengan timer yang direset penuh!
+        
                     setTimeout(() => { window.location.href = data.redirect_url; }, 1500);
                 } else {
                     Swal.fire({
