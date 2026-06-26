@@ -29,14 +29,28 @@
                 <span>E-Tabungan<span class="text-blue-600">.</span></span>
             </a>
 
-            <div class="flex items-center gap-5">
-                <a href="/harga-paket" class="text-sm font-semibold text-blue-600 hidden sm:inline-block">Harga Paket</a>
-                <a href="/download-app-landing" class="text-sm font-semibold text-slate-600 hover:text-blue-600 transition hidden sm:inline-block">Download App</a>
-                <div class="h-4 w-px bg-slate-200 hidden sm:inline-block"></div>
+            <div class="hidden md:flex items-center gap-5">
+                <a href="/harga-paket" class="text-sm font-semibold text-blue-600">Harga Paket</a>
+                <a href="/download-app-landing" class="text-sm font-semibold text-slate-600 hover:text-blue-600 transition">Download App</a>
+                <div class="h-4 w-px bg-slate-200"></div>
                 <a href="/login" class="px-4 py-2 text-sm font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl border border-slate-200 transition duration-200 shadow-sm">
                     Masuk / Daftar
                 </a>
             </div>
+
+            <div class="flex items-center gap-3 md:hidden">
+                <a href="/login" class="px-3 py-1.5 text-sm font-bold text-slate-700 bg-slate-100 rounded-xl border border-slate-200 shadow-sm">
+                    Masuk / Daftar
+                </a>
+                <button id="hamburger-btn" class="text-slate-600 hover:text-blue-600 p-2 focus:outline-none transition">
+                    <i class="fa-solid fa-bars text-xl"></i>
+                </button>
+            </div>
+        </div>
+
+        <div id="mobile-menu" class="hidden md:hidden bg-white border-b border-slate-200 px-6 py-4 space-y-1 shadow-lg">
+            <a href="/harga-paket" class="block text-sm font-bold text-blue-600 py-2.5 border-b border-slate-50">Harga Paket</a>
+            <a href="/download-app-landing" class="block text-sm font-bold text-slate-600 hover:text-blue-600 py-2.5">Download App</a>
         </div>
     </nav>
 
@@ -52,11 +66,9 @@
         </p>
     </section>
 
-    <!-- Kartu Ringkas (Efek Hover Grow Ditambahkan Di Sini) -->
     <section class="max-w-6xl mx-auto px-4 py-8">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
 
-            <!-- Bronze Tier -->
             <div class="bg-white border border-slate-200 rounded-2xl p-8 flex flex-col items-center shadow-sm transform transition-all duration-300 hover:-translate-y-2 hover:scale-[1.03] hover:shadow-lg">
                 <div class="p-3 bg-amber-50 rounded-full mb-4 border border-amber-100">
                     <i class="fa-solid fa-trophy text-amber-600 text-3xl"></i>
@@ -69,7 +81,6 @@
                 </a>
             </div>
 
-            <!-- Silver Tier -->
             <div class="bg-white border-2 border-blue-300 rounded-2xl p-8 flex flex-col items-center shadow-md transform transition-all duration-300 hover:-translate-y-2 hover:scale-[1.03] hover:shadow-xl hover:border-blue-400">
                 <div class="p-3 bg-blue-50 rounded-full mb-4 border border-blue-100">
                     <i class="fa-solid fa-bookmark text-blue-600 text-3xl"></i>
@@ -82,7 +93,6 @@
                 </a>
             </div>
 
-            <!-- Golden Tier -->
             <div class="bg-white border-2 border-amber-400 rounded-2xl p-8 flex flex-col items-center shadow-md relative transform transition-all duration-300 hover:-translate-y-2 hover:scale-[1.03] hover:shadow-xl hover:border-amber-500">
                 <div class="absolute -top-3 bg-gradient-to-r from-amber-400 to-yellow-400 text-slate-950 px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wider shadow-sm">
                     Paling Populer
@@ -101,7 +111,6 @@
         </div>
     </section>
 
-    <!-- Tabel Perbandingan Detail -->
     <section class="max-w-5xl mx-auto px-4 py-16">
         <h2 class="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight text-center mb-10">
             Perbandingan Fitur Lengkap
@@ -201,7 +210,6 @@
         </p>
     </section>
 
-    <!-- CTA Akhir -->
     <section class="max-w-4xl mx-auto px-4 py-16 text-center">
         <div class="bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl p-10 sm:p-12 shadow-xl shadow-blue-600/20">
             <h2 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mb-3">
@@ -219,6 +227,15 @@
     <footer class="w-full text-center py-8 text-xs text-slate-400 border-t border-slate-100">
         &copy; {{ date('Y') }} E-Tabungan. Hak Cipta Dilindungi.
     </footer>
+
+    <script>
+        const hamburgerBtn = document.getElementById('hamburger-btn');
+        const mobileMenu = document.getElementById('mobile-menu');
+
+        hamburgerBtn.addEventListener('click', () => {
+            mobileMenu.classList.toggle('hidden');
+        });
+    </script>
 
 </body>
 </html>

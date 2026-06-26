@@ -31,8 +31,10 @@
         <div class="absolute bottom-[-10%] right-[-10%] w-[600px] h-[600px] bg-amber-500/5 rounded-full blur-3xl"></div>
     </div>
 
+    <!-- NAVBAR RESPONSIF BARU -->
     <nav class="w-full fixed top-0 left-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200/80 shadow-sm">
         <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+            <!-- Logo -->
             <a href="#" class="flex items-center gap-2.5 font-bold text-xl text-slate-900 tracking-tight hover:opacity-90 transition">
                 <div class="bg-blue-600 p-2 rounded-lg text-sm flex items-center justify-center shadow-md shadow-blue-600/20">
                     <i class="fa-solid fa-wallet text-white"></i>
@@ -40,17 +42,36 @@
                 <span>E-Tabungan<span class="text-blue-600">.</span></span>
             </a>
 
-            <div class="flex items-center gap-5">
-                <a href="/harga-paket" class="text-sm font-semibold text-slate-600 hover:text-blue-600 transition hidden sm:inline-block">Harga Paket</a>
-                <a href="/download-app-landing" class="text-sm font-semibold text-slate-600 hover:text-blue-600 transition hidden sm:inline-block">Download App</a>
-                <div class="h-4 w-px bg-slate-200 hidden sm:inline-block"></div>
+            <!-- Menu Desktop (Muncul di Laptop / Tablet) -->
+            <div class="hidden md:flex items-center gap-5">
+                <a href="/harga-paket" class="text-sm font-semibold text-slate-600 hover:text-blue-600 transition">Harga Paket</a>
+                <a href="/download-app-landing" class="text-sm font-semibold text-slate-600 hover:text-blue-600 transition">Download App</a>
+                <div class="h-4 w-px bg-slate-200"></div>
                 <a href="/login" class="px-4 py-2 text-sm font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl border border-slate-200 transition duration-200 shadow-sm">
                     Masuk / Daftar
                 </a>
             </div>
+
+            <!-- Menu Kanan Mobile (Hanya Muncul di Layar HP) -->
+            <div class="flex items-center gap-3 md:hidden">
+                <a href="/login" class="px-3 py-1.5 text-sm font-bold text-slate-700 bg-slate-100 rounded-xl border border-slate-200 shadow-sm">
+                    Masuk / Daftar
+                </a>
+                <!-- Tombol Hamburger -->
+                <button id="hamburger-btn" class="text-slate-600 hover:text-blue-600 p-2 focus:outline-none transition">
+                    <i class="fa-solid fa-bars text-xl"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Menu Dropdown Mobile (Terbuka saat Hamburger di-klik) -->
+        <div id="mobile-menu" class="hidden md:hidden bg-white border-b border-slate-200 px-6 py-4 space-y-1 shadow-lg">
+            <a href="/harga-paket" class="block text-sm font-bold text-slate-600 hover:text-blue-600 py-2.5 border-b border-slate-50">Harga Paket</a>
+            <a href="/download-app-landing" class="block text-sm font-bold text-slate-600 hover:text-blue-600 py-2.5">Download App</a>
         </div>
     </nav>
 
+    <!-- Hero Section -->
     <section class="min-h-screen flex flex-col items-center justify-center px-4 pt-10 text-center relative">
         <div class="max-w-4xl mx-auto">
             <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-100 text-blue-600 text-xs font-semibold mb-6 tracking-wide uppercase shadow-sm">
@@ -82,6 +103,7 @@
         </div>
     </section>
 
+    <!-- Paket Layanan -->
     <section id="paket-layanan" class="max-w-6xl mx-auto px-4 py-24 scroll-mt-132">
         <div class="text-center mb-16">
             <h2 class="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight mb-4">
@@ -94,6 +116,7 @@
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch pt-4">
             
+            <!-- Bronze Tier -->
             <div class="bg-white border border-slate-200 rounded-2xl p-8 flex flex-col items-center shadow-sm relative transition-all duration-300 transform hover:scale-105 hover:shadow-md hover:border-slate-300">
                 <div class="p-3 bg-amber-50 rounded-full mb-4 border border-amber-100">
                     <i class="fa-solid fa-trophy text-amber-600 text-3xl"></i>
@@ -120,6 +143,7 @@
                 </a>
             </div>
 
+            <!-- Silver Tier -->
             <div class="bg-white border border-slate-200 rounded-2xl p-8 flex flex-col items-center shadow-sm relative transition-all duration-300 transform hover:scale-105 hover:shadow-md hover:border-blue-400">
                 <div class="p-3 bg-blue-50 rounded-full mb-4 border border-blue-100">
                     <i class="fa-solid fa-bookmark text-blue-600 text-3xl"></i>
@@ -146,6 +170,7 @@
                 </a>
             </div>
 
+            <!-- Golden Tier -->
             <div class="bg-white border-2 border-amber-400 rounded-2xl p-8 flex flex-col items-center shadow-md relative transform md:-translate-y-4 transition-all duration-300 hover:scale-110 hover:shadow-lg hover:border-amber-500">
                 <div class="absolute -top-3 bg-gradient-to-r from-amber-400 to-yellow-400 text-slate-950 px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wider shadow-sm">
                     Paling Populer
@@ -177,6 +202,16 @@
 
         </div>
     </section>
+
+    <!-- JavaScript untuk Toggle Hamburger Menu Mobile -->
+    <script>
+        const hamburgerBtn = document.getElementById('hamburger-btn');
+        const mobileMenu = document.getElementById('mobile-menu');
+
+        hamburgerBtn.addEventListener('click', () => {
+            mobileMenu.classList.toggle('hidden');
+        });
+    </script>
 
 </body>
 </html>
