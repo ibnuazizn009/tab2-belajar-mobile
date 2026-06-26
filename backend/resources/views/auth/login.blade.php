@@ -40,6 +40,12 @@
                 <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Selamat Datang Kembali</h2>
                 <p class="text-sm text-slate-500 mt-1">Silakan masuk untuk mengelola tabungan siswa</p>
             </div>
+            
+            @if(session('error'))
+                <div class="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm font-semibold text-center">
+                    ⚠️ {{ session('error') }}
+                </div>
+            @endif
 
             @if ($errors->any())
                 <div class="mb-5 p-4 bg-red-50 border-l-4 border-red-500 rounded-r-xl text-sm text-red-600">

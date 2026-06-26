@@ -19,12 +19,14 @@ class CaptureTokenFromCookie
     {
         $token = $request->cookie('token_jwt') ?? $request->bearerToken();
 
-        if (!$token) {
+        if ($request->expectsJson()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthenticated. Token tidak ditemukan.',
+                'message' => 'Unauthenticated. Token tidak ditemukan.'
             ], 401);
         }
+
+        return redirect()->route('login')->with('error', 'Silakan login terlebih dahulu.');
 
         try {
             $user = JWTAuth::setToken($token)->authenticate();
