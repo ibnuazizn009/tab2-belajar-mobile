@@ -42,6 +42,7 @@
 
             <div class="flex items-center gap-5">
                 <a href="/harga-paket" class="text-sm font-semibold text-slate-600 hover:text-blue-600 transition hidden sm:inline-block">Harga Paket</a>
+                <a href="/download-app-landing" class="text-sm font-semibold text-slate-600 hover:text-blue-600 transition hidden sm:inline-block">Download App</a>
                 <div class="h-4 w-px bg-slate-200 hidden sm:inline-block"></div>
                 <a href="/login" class="px-4 py-2 text-sm font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl border border-slate-200 transition duration-200 shadow-sm">
                     Masuk / Daftar
