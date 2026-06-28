@@ -161,6 +161,31 @@ class SiswaController extends Controller
         }
     }
 
+    public function getRiwayatAktivitasTransaksi(Request $request)
+    {
+        try {
+            $sekolahId = Auth::user()->sekolah_id;
+            $kelasId   = $request->input('kelasId');
+
+            $transaksi = Transaksi::whereHas('siswa', function($query) use ($kelasId, $sekolahId) {
+                    $query->where('kelas_id', $kelasId)
+                        ->where('sekolah_id', $sekolahId);
+                })
+                ->with(['siswa:id,nama_siswa']) 
+                ->orderBy('created_at', 'desc')
+                ->limit(10)
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'data'    => $transaksi
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
     public function postTambahSiswa(Request $request)
     {
         try {

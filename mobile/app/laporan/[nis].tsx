@@ -3,19 +3,22 @@ import { useQuery } from '@tanstack/react-query';
 import * as SecureStore from 'expo-secure-store';
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView, RefreshControl, Alert } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, router } from 'expo-router';
 import { exportDetailTransaksiPdf } from '../../utils/exportPdf';
 import { tab2ApiService } from '../../services/Tab2apiservice';
 import { SkeletonTransaksi } from '../../components/SkeletonLoader';
 import { formatRupiah, formatTanggalIndo } from '../../utils/formatTanggal';
 import { CHECK_FEATURE } from '@/constants/Features'; // 🎯 Import helper penentu bisnis tiering
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { MinimalBlueBackground } from "@/components/BackgroundLinearGradient";
 
 export default function DetailTransaksiScreen() {
+  const insets = useSafeAreaInsets();
+
   const { nis, nama, nama_kelas, saldo: saldoStr } = useLocalSearchParams<{ nis: string; nama: string, nama_kelas: string, saldo: string }>();
   const saldo = Number(saldoStr) || 0;
   const [isExporting, setIsExporting] = useState(false);
   
-  // 🎯 State lokal penampung hak akses user login
   const [userInfo, setUserInfo] = useState<any>(null);
 
   useEffect(() => {
@@ -76,9 +79,26 @@ export default function DetailTransaksiScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: nama || 'Detail Transaksi' }} />
+      <Stack.Screen options={{ headerShown:false }} />
+      
+      <MinimalBlueBackground />
+
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+        <View style={styles.headerContent}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <FontAwesome name="arrow-left" size={18} color="#FFFFFF" />
+          </TouchableOpacity>
+
+          <Text style={styles.headerTitle}>Detail Transaksi</Text>
+
+          <View style={{ width: 40 }} />
+        </View>
+      </View>
       <ScrollView
-        style={styles.container}
+        style={[styles.container, { backgroundColor: 'transparent' }]}
         contentContainerStyle={[{ flexGrow: 1 }, styles.contentContainer]}
         bounces={true}
         alwaysBounceVertical={true}
@@ -164,6 +184,31 @@ export default function DetailTransaksiScreen() {
 }
 
 const styles = StyleSheet.create({
+  header: {
+    backgroundColor: '#2563eb',
+    borderBottomWidth: 0,
+    paddingBottom: 15
+  },
+  headerContent:{
+    flexDirection:'row',
+    justifyContent:'space-between',
+    alignItems:'center',
+    paddingHorizontal:16
+  },
+  backButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 0, 
+  },
+  headerTitle: {
+    fontSize: 19,
+    fontWeight: '700',
+    color: '#FFFFFF'
+  },
   container: { flex: 1, backgroundColor: '#f8fafc' },
   infoCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', padding: 20, borderBottomWidth: 1, borderColor: '#e2e8f0' },
   namaText: { fontSize: 16, fontWeight: 'bold', color: '#1e293b' },

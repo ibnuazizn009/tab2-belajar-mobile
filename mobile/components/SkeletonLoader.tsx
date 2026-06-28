@@ -131,6 +131,26 @@ export const SkeletonRiwayat = () => (
   </ScrollView>
 );
 
+export const SkeletonAktivitas = () => (
+  <View style={sk.container}>
+    {[0, 1, 2].map((i) => (
+      <View key={i} style={sk.row}>
+        {/* Icon Circle */}
+        <SkeletonBox width={32} height={32} style={{ borderRadius: 16 }} />
+        
+        {/* Text Area */}
+        <View style={{ flex: 1, marginLeft: 12 }}>
+          <SkeletonBox width={120} height={14} style={{ marginBottom: 6 }} />
+          <SkeletonBox width={80} height={10} />
+        </View>
+        
+        {/* Amount */}
+        <SkeletonBox width={70} height={14} />
+      </View>
+    ))}
+  </View>
+);
+
 // ===========================
 // SKELETON: Generic (Fallback)
 // Untuk halaman baru yang belum punya skeleton khusus
@@ -149,6 +169,16 @@ export const SkeletonGeneric = ({ rows = 5 }: { rows?: number }) => (
 );
 
 const sk = StyleSheet.create({
+  container: {
+    paddingVertical: 4,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
   statsBox: {
     flex: 1,
     backgroundColor: '#fff',

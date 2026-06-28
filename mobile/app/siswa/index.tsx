@@ -6,7 +6,7 @@ import { File, Paths } from 'expo-file-system/next';
 import * as Sharing from 'expo-sharing';
 import { ScrollView, StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, RefreshControl, Linking } from 'react-native';
 import Modal from 'react-native-modal';
-import { Stack } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import { FontAwesome } from '@expo/vector-icons';
 import { tab2ApiService } from '../../services/Tab2apiservice';
 import { SkeletonBox } from '../../components/SkeletonLoader';
@@ -14,8 +14,12 @@ import { exportSiswaListPdf } from '../../utils/exportPdf';
 import { CHECK_FEATURE } from '@/constants/Features'; // 🎯 1. Import helper fitur bisnis
 import { tab2Toast } from '@/utils/tab2Toast';
 import { downloadAndSaveToDocuments } from '@/utils/exportPdf';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { MinimalBlueBackground } from "@/components/BackgroundLinearGradient";
 
 export default function SiswaScreen() {
+  const insets = useSafeAreaInsets();
+
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const [dataSiswa, setDataSiswa] = useState<any[]>([]);
@@ -220,10 +224,26 @@ export default function SiswaScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Cari Siswa' }} />
-  
+      <Stack.Screen options={{ headerShown:false }} />
+    
+      <MinimalBlueBackground />
+
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+        <View style={styles.headerContent}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <FontAwesome name="arrow-left" size={18} color="#FFFFFF" />
+          </TouchableOpacity>
+
+          <Text style={styles.headerTitle}>Cari Siswa</Text>
+
+          <View style={{ width: 40 }} />
+        </View>
+      </View>
       <ScrollView 
-        style={styles.container}
+        style={[styles.container, { backgroundColor: 'transparent' }]}
         contentContainerStyle={{ flexGrow: 1 }} 
         bounces={true}                         
         alwaysBounceVertical={true}             
@@ -497,10 +517,22 @@ const styles = StyleSheet.create({
   emptyText: { color: '#94a3b8', fontSize: 14, marginTop: 10 },
   
   actionRow: { flexDirection: 'row', paddingHorizontal: 8, paddingVertical: 10, gap: 10 },
-  actionButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 12, borderRadius: 10, gap: 6 },
-  exportButton: { backgroundColor: '#dc2626' },
-  addButton: { backgroundColor: '#0284c7' },
-  buttonText: { color: '#fff', fontWeight: '600', fontSize: 13 },
+  actionButton: { 
+    flex: 1, 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    padding: 12, 
+    borderRadius: 10, 
+    gap: 6 
+  },
+  exportButton: { backgroundColor: '#ea580c' },
+  addButton: { backgroundColor: '#2563eb' },
+  buttonText: { 
+    color: '#fff', 
+    fontWeight: '600', 
+    fontSize: 13 
+  },
 
   modalContent: { width: '90%', backgroundColor: '#fff', borderRadius: 16, padding: 20, elevation: 5, alignSelf: 'center' },
   modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#1e293b', marginBottom: 16 },
@@ -535,12 +567,41 @@ const styles = StyleSheet.create({
     marginVertical: 10,
   },
   importSection: { flexDirection: 'row', paddingHorizontal: 8, gap: 10 },
-  templateButton: {
-    backgroundColor: '#3b82f6', // Biru untuk template
+  templateButton: { 
+    backgroundColor: '#7c3aed',
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 10,
+    gap: 6
   },
-  importButton: {
-    backgroundColor: '#10b981', // Hijau untuk import
-    flex: 1,
+  importButton: { backgroundColor: '#059669' },
+  lockedButton: { backgroundColor: '#94a3b8' },
+  header: {
+    backgroundColor: '#2563eb',
+    borderBottomWidth: 0,
+    paddingBottom: 15
+  },
+  headerContent:{
+    flexDirection:'row',
+    justifyContent:'space-between',
+    alignItems:'center',
+    paddingHorizontal:16
+  },
+  backButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 0, 
+  },
+  headerTitle: {
+    fontSize: 19,
+    fontWeight: '700',
+    color: '#FFFFFF'
   },
 });

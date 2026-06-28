@@ -5,8 +5,12 @@ import { FontAwesome } from '@expo/vector-icons';
 import { Stack, router } from 'expo-router';
 import { tab2ApiService } from '../../services/Tab2apiservice';
 import { SkeletonRiwayat } from '../../components/SkeletonLoader';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { MinimalBlueBackground } from "@/components/BackgroundLinearGradient";
 
 export default function LaporanScreen() {
+  const insets = useSafeAreaInsets();
+
   const [search, setSearch] = useState('');
   const [laporanKeuangan, setLaporanKeuangan] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -70,9 +74,26 @@ export default function LaporanScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Laporan Tabungan' }} />
+      <Stack.Screen options={{ headerShown:false }} />
+      
+      <MinimalBlueBackground />
+
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+        <View style={styles.headerContent}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <FontAwesome name="arrow-left" size={18} color="#FFFFFF" />
+          </TouchableOpacity>
+
+          <Text style={styles.headerTitle}>Laporan Tabungan</Text>
+
+          <View style={{ width: 40 }} />
+        </View>
+      </View>
       <ScrollView
-        style={styles.container}
+        style={[styles.container, { backgroundColor: 'transparent' }]}
         contentContainerStyle={[{ flexGrow: 1 }, styles.contentContainer]}
         bounces={true}
         alwaysBounceVertical={true}
@@ -103,7 +124,7 @@ export default function LaporanScreen() {
         {isLoading ? (
           <SkeletonRiwayat />
         ) : (
-          <View style={{ paddingBottom: 40 }}>
+          <View style={{ paddingBottom: 40, paddingTop:10 }}>
             {filteredData.length === 0 ? (
               <View style={styles.emptyState}>
                 <FontAwesome name="folder-open" size={40} color="#cbd5e1" />
@@ -149,6 +170,31 @@ export default function LaporanScreen() {
 }
 
 const styles = StyleSheet.create({
+  header: {
+    backgroundColor: '#2563eb',
+    borderBottomWidth: 0,
+    paddingBottom: 15
+  },
+  headerContent:{
+    flexDirection:'row',
+    justifyContent:'space-between',
+    alignItems:'center',
+    paddingHorizontal:16
+  },
+  backButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 0, 
+  },
+  headerTitle: {
+    fontSize: 19,
+    fontWeight: '700',
+    color: '#FFFFFF'
+  },
   container: { flex: 1, backgroundColor: '#f8fafc' },
   searchSection: { backgroundColor: '#fff', paddingHorizontal: 5, paddingVertical: 12, borderBottomWidth: 1, borderColor: '#e2e8f0' },
   searchWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f1f5f9', borderRadius: 10, paddingHorizontal: 12, height: 40 },

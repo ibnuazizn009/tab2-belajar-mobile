@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, StyleSheet, Linking, Modal, ScrollView, Animated, Easing, Dimensions } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, StyleSheet, Linking, Modal, ScrollView, Animated, Easing, Dimensions, Image } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { AppToast } from '@/components/ToastProvider';
 
@@ -25,21 +25,18 @@ export default function LoginView({
   styles,
 }: LoginViewProps) {
   const [modalType, setModalType] = useState<'none' | 'panduan' | 'syarat'>('none');
-  const [secureText, setSecureText] = useState(true); // 👈 State untuk memanipulasi hide/show password
+  const [secureText, setSecureText] = useState(true);
   
-  // Nilai animasi untuk posisi Y dan transparansi overlay
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
-  // Efek trigger ketika modal dibuka atau ditutup
   useEffect(() => {
     if (modalType !== 'none') {
-      // Jalankan animasi Buka (Slide Up & Fade In) secara bersamaan
       Animated.parallel([
         Animated.timing(slideAnim, {
           toValue: 0,
-          duration: 450, // 👈 Durasi meluncur (lebih lambat & anggun)
-          easing: Easing.out(Easing.cubic), // 👈 Efek melambat di akhir sliding
+          duration: 450,
+          easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }),
         Animated.timing(fadeAnim, {
@@ -51,12 +48,11 @@ export default function LoginView({
     }
   }, [modalType]);
 
-  // Fungsi menutup modal secara halus sebelum mengubah state modalType
   const closeModalSmoothly = () => {
     Animated.parallel([
       Animated.timing(slideAnim, {
         toValue: SCREEN_HEIGHT,
-        duration: 400, // Durasi menutup turun ke bawah
+        duration: 400,
         easing: Easing.in(Easing.cubic),
         useNativeDriver: true,
       }),
@@ -66,7 +62,7 @@ export default function LoginView({
         useNativeDriver: true,
       })
     ]).start(() => {
-      setModalType('none'); // Ubah state setelah animasi tutup selesai berjalan
+      setModalType('none');
     });
   };
 
@@ -79,12 +75,17 @@ export default function LoginView({
   return (
     <View style={styles.loginContainer}>
       <View style={styles.loginCard}>
-        <View style={styles.loginIconWrapper}>
-          <FontAwesome name="bank" size={40} color="#0284c7" />
+        
+        {/* LOGO BARU (Ukuran sudah diperkecil) */}
+        <View style={localStyles.logoWrapper}>
+          <Image 
+            source={require('../assets/images/tab21_logo.png')} // 👈 Sesuaikan dengan letak folder gambar Anda yang baru
+            style={localStyles.logoImage}
+          />
         </View>
         
         <Text style={styles.loginTitle}>E-Tabungan Siswa</Text>
-        <Text style={styles.loginSubTitle}>Silakan masuk ke akun petugas Anda</Text>
+        <Text style={styles.loginSubTitle}>Silakan masuk ke akun Anda</Text>
 
         {/* Input Form Username */}
         <View style={styles.inputGroup}>
@@ -102,21 +103,20 @@ export default function LoginView({
           </View>
         </View>
 
-        {/* Input Form Password dengan Tombol Mata */}
+        {/* Input Form Password */}
         <View style={styles.inputGroup}>
           <Text style={styles.inputLabel}>Password</Text>
           <View style={styles.inputWrapper}>
             <FontAwesome name="lock" size={18} color="#94a3b8" style={styles.inputIcon} />
             <TextInput 
-              style={[styles.textInput, { flex: 1 }]} // Pastikan textInput mengambil sisa ruang agar tombol mata pas di kanan
+              style={[styles.textInput, { flex: 1 }]} 
               placeholder="Masukkan password"
               placeholderTextColor="#94a3b8"
-              secureTextEntry={secureText} // 👈 Dinamis mengikuti state secureText
+              secureTextEntry={secureText} 
               value={password}
               onChangeText={setPassword}
               autoCapitalize="none"
             />
-            {/* 🎯 Tombol Mata Toggle Hide/Show */}
             <TouchableOpacity 
               style={localStyles.eyeIconWrapper} 
               onPress={() => setSecureText(!secureText)}
@@ -131,8 +131,9 @@ export default function LoginView({
           </View>
         </View>
 
+        {/* 🎯 WARNA TOMBOL DIKUNCI KE #2563eb (Sama dengan Web) */}
         <TouchableOpacity 
-          style={styles.loginButton} 
+          style={[styles.loginButton, { backgroundColor: '#2563eb' }]} 
           onPress={handleLogin} 
           activeOpacity={0.8}
           disabled={isSubmitting}
@@ -161,7 +162,7 @@ export default function LoginView({
         </View>
       </View>
 
-      {/* ================= MODAL DENGAN CUSTOM TIMING ANIMATION ================= */}
+      {/* ================= MODAL PANDUAN & KETENTUAN ================= */}
       <Modal
         visible={modalType !== 'none'}
         animationType="none" 
@@ -226,11 +227,21 @@ export default function LoginView({
 }
 
 const localStyles = StyleSheet.create({
+  logoWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  // 🎯 UKURAN LOGO SUDAH DIPERKECIL MENJADI 70
+  logoImage: {
+    width: 70,
+    height: 70,
+    resizeMode: 'contain',
+  },
   infoFooter: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 25 },
-  infoLink: { fontSize: 13, color: '#0284c7', fontWeight: '500' },
+  infoLink: { fontSize: 13, color: '#2563eb', fontWeight: '600' }, 
   divider: { marginHorizontal: 10, color: '#cbd5e1' },
   
-  // Styling tambahan khusus untuk menyeimbangkan posisi mata di sisi kanan wrapper input
   eyeIconWrapper: {
     paddingHorizontal: 10,
     justifyContent: 'center',
@@ -261,7 +272,7 @@ const localStyles = StyleSheet.create({
   stepTitle: { fontSize: 14, fontWeight: '700', color: '#0f172a', marginBottom: 5 },
   stepText: { fontSize: 13, color: '#475569', lineHeight: 20, marginBottom: 8, paddingLeft: 5 },
   skText: { fontSize: 13, color: '#475569', lineHeight: 22, marginBottom: 10, textAlign: 'justify' },
-  webButton: { backgroundColor: '#0284c7', flexDirection: 'row', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 6, alignSelf: 'flex-start', marginVertical: 8, marginLeft: 5, alignItems: 'center' },
+  webButton: { backgroundColor: '#2563eb', flexDirection: 'row', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 6, alignSelf: 'flex-start', marginVertical: 8, marginLeft: 5, alignItems: 'center' }, 
   webButtonText: { color: '#fff', fontSize: 12, fontWeight: '600' },
   closeButton: { backgroundColor: '#f1f5f9', paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
   closeButtonText: { color: '#334155', fontSize: 14, fontWeight: '600' }

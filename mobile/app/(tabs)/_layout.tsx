@@ -1,17 +1,19 @@
 import { Tabs, router } from 'expo-router';
 import React, { useState, useRef, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, PanResponder, ActivityIndicator } from 'react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, PanResponder, ActivityIndicator, AppState, AppStateStatus } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store'
 import { tab2ApiService } from '../../services/Tab2apiservice'
 import LoginView from '@/components/LoginView';
 import { tab2Toast } from '@/utils/tab2Toast';
+import { Ionicons } from '@expo/vector-icons';
 
 // Fungsi global agar bisa dipanggil dari file index.tsx (Dashboard) untuk logout
 export let triggerLogoutGlobal = () => {};
 
 const TIMEOUT_IDLE = 30 * 60 * 1000; // 30 Menit Otomatis Logout
+const BACKGROUND_TIMESTAMP_KEY = 'last_background_at';
 
 export default function TabLayout() {
   const queryClient = useQueryClient();
@@ -28,9 +30,33 @@ export default function TabLayout() {
     const checkExistingSession = async () => {
       try {
         const token = await SecureStore.getItemAsync('access_token');
-        if (token) {
-          setIsLoggedIn(true);
+        if (!token) return;
+
+        // Jika app sempat di-kill saat background, timestamp ini masih tersimpan.
+        // Cek dulu sebelum login otomatis, jangan sampai sesi lama (>30 menit) lolos.
+        const storedTimestamp = await SecureStore.getItemAsync(BACKGROUND_TIMESTAMP_KEY);
+        if (storedTimestamp) {
+          const elapsed = Date.now() - parseInt(storedTimestamp, 10);
+          await SecureStore.deleteItemAsync(BACKGROUND_TIMESTAMP_KEY);
+
+          if (elapsed >= TIMEOUT_IDLE) {
+            // Tidak perlu tampilkan alert di cold start, cukup bersihkan token diam-diam
+            try {
+              await tab2ApiService.postNonMessage(
+                `${process.env.EXPO_PUBLIC_API_URL}/auth/logout`,
+                {},
+                'logout'
+              );
+            } catch (error) {
+              console.log('Logout API gagal saat cold-start check, lanjut cleanup lokal:', error);
+            }
+            await SecureStore.deleteItemAsync('access_token');
+            await SecureStore.deleteItemAsync('user_info');
+            return;
+          }
         }
+
+        setIsLoggedIn(true);
       } catch (error) {
         console.error("Gagal membaca session:", error);
       }
@@ -50,22 +76,39 @@ export default function TabLayout() {
     }
   };
 
-  const handleAutoLogout = async () => {
-    try {
-      await SecureStore.deleteItemAsync('access_token');
-      await SecureStore.deleteItemAsync('user_info');
-      
-      setIsLoggedIn(false);
+  // Logic inti logout: hapus token lokal + clear query cache.
+  // Dipakai bersama oleh auto-logout (idle/background) dan logout manual.
+  const clearSessionLocally = async () => {
+    await SecureStore.deleteItemAsync('access_token');
+    await SecureStore.deleteItemAsync('user_info');
+    await SecureStore.deleteItemAsync(BACKGROUND_TIMESTAMP_KEY);
+    queryClient.clear();
+    setIsLoggedIn(false);
+    setUsername('');
+    setPassword('');
+  };
 
-      Alert.alert(
-        "Sesi Berakhir",
-        "Anda telah otomatis keluar karena tidak ada aktivitas selama beberapa saat demi keamanan data.",
-        [{ text: "Mengerti" }]
+  const handleAutoLogout = async (reason: 'idle' | 'background' = 'idle') => {
+    try {
+      // Beri tahu server agar token ini di-invalidate juga (mis. is_use / blacklist)
+      await tab2ApiService.postNonMessage(
+        `${process.env.EXPO_PUBLIC_API_URL}/auth/logout`,
+        {},
+        'logout'
       );
     } catch (error) {
-      console.error("Gagal menghapus sesi saat auto logout:", error);
-      setIsLoggedIn(false);
+      console.log('Logout API gagal saat auto-logout, lanjut cleanup lokal:', error);
     }
+
+    await clearSessionLocally();
+
+    Alert.alert(
+      "Sesi Berakhir",
+      reason === 'background'
+        ? "Anda telah otomatis keluar karena aplikasi tidak aktif terlalu lama demi keamanan data."
+        : "Anda telah otomatis keluar karena tidak ada aktivitas selama beberapa saat demi keamanan data.",
+      [{ text: "Mengerti" }]
+    );
   };
 
   triggerLogoutGlobal = async () => {
@@ -85,12 +128,7 @@ export default function TabLayout() {
       {
         duration: 2000,
         onHide: () => {
-          SecureStore.deleteItemAsync('access_token');
-          SecureStore.deleteItemAsync('user_info');
-          queryClient.clear();
-          setIsLoggedIn(false);
-          setUsername('');
-          setPassword('');
+          clearSessionLocally();
         }
       }
     );
@@ -108,11 +146,55 @@ export default function TabLayout() {
     };
   }, [isLoggedIn]);
 
+  // Deteksi idle saat app di background (mis. diminimize / layar terkunci).
+  // JS timer (setTimeout) tidak reliable saat app disuspend, jadi kita catat
+  // timestamp saat masuk background lalu hitung selisihnya saat kembali foreground.
+  useEffect(() => {
+    const handleAppStateChange = async (nextState: AppStateStatus) => {
+      if (!isLoggedIn) return;
+
+      if (nextState === 'background' || nextState === 'inactive') {
+        try {
+          await SecureStore.setItemAsync(BACKGROUND_TIMESTAMP_KEY, Date.now().toString());
+        } catch (error) {
+          console.error('Gagal menyimpan timestamp background:', error);
+        }
+        // Hentikan timer foreground, biar tidak dobel dengan pengecekan background
+        if (timerRef.current) clearTimeout(timerRef.current);
+      }
+
+      if (nextState === 'active') {
+        try {
+          const storedTimestamp = await SecureStore.getItemAsync(BACKGROUND_TIMESTAMP_KEY);
+          if (storedTimestamp) {
+            const elapsed = Date.now() - parseInt(storedTimestamp, 10);
+            await SecureStore.deleteItemAsync(BACKGROUND_TIMESTAMP_KEY);
+
+            if (elapsed >= TIMEOUT_IDLE) {
+              await handleAutoLogout('background');
+              return; // sudah logout, tidak perlu reset timer lagi
+            }
+          }
+        } catch (error) {
+          console.error('Gagal memeriksa timestamp background:', error);
+        }
+        // Kembali aktif & belum kena timeout -> lanjutkan idle timer foreground
+        resetIdleTimer();
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+
+    return () => {
+      subscription.remove();
+    };
+  }, [isLoggedIn]);
+
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => {
         resetIdleTimer();
-        return false; // Tetap lewatkan event touch ke komponen child (tombol/input)
+        return false; 
       },
       onMoveShouldSetPanResponder: () => {
         resetIdleTimer();
@@ -146,7 +228,6 @@ export default function TabLayout() {
         
         const apiData = responseData.data;
 
-        console.log(apiData);
         await Promise.all([
           SecureStore.setItemAsync('access_token', apiData.access_token),
           SecureStore.setItemAsync('user_info', JSON.stringify(apiData.user || {}))
@@ -205,65 +286,137 @@ export default function TabLayout() {
     <View style={{ flex: 1 }} {...panResponder.panHandlers}>
       <Tabs
         screenOptions={{
-          tabBarActiveTintColor: '#0284c7',   
-          tabBarInactiveTintColor: '#94a3b8', 
+          headerShown: false,
+          tabBarShowLabel: true,
+          tabBarActiveTintColor: '#2563eb',
+          tabBarInactiveTintColor: '#94a3b8',
+          freezeOnBlur: true,
+          lazy: true,
           tabBarStyle: {
-            paddingBottom: 5,
-            height: 60,
+              position: 'absolute',
+              left: 16,
+              right: 16,
+              bottom: 16,
+              height: 72,
+              borderRadius: 22,
+              backgroundColor: '#ffffff',
+              borderTopWidth: 0,
+              elevation: 15,
+              shadowColor: '#2563eb',
+              shadowOpacity: 0.12,
+              shadowRadius: 15,
+              shadowOffset: {
+                  width: 0,
+                  height: 8,
+              },
           },
+      
           tabBarLabelStyle: {
-            fontSize: 12,
-            fontWeight: '500',
+              fontSize: 11,
+              fontWeight: '600',
+              marginBottom: 6,
           },
-          headerShown: true,
-        }}>
+      
+          tabBarIconStyle: {
+              marginTop: 6,
+          },
+      }}>
         
         {/* Tab 1: Beranda */}
         <Tabs.Screen
-          name="index"
-          options={{
-            title: 'Home',
-            tabBarIcon: ({ color }) => <FontAwesome name="home" size={24} color={color} />,
-            headerShown: false,
-          }}
+            name="index"
+            options={{
+                title: "Home",
+                headerShown:false,
+                tabBarIcon: ({color,size})=>(
+                    <Ionicons
+                        name="home"
+                        color={color}
+                        size={24}
+                    />
+                ),
+            }}
         />
 
         {/* Tab 2: Transaksi */}
         <Tabs.Screen
-          name="transaksi"
-          listeners={{
-            tabPress: (e) => {
-              e.preventDefault();
-              router.replace({
-                pathname: '/transaksi',
-                params: { defaultTipe: '', hideOther: '' }
-              });
-            },
-          }}
-          options={{
-            title: 'Transaksi',
-            tabBarIcon: ({ color }) => <FontAwesome name="exchange" size={22} color={color} />,
-            headerTitle: 'Input Transaksi',
-          }}
+            name="transaksi"
+            options={{
+                title:"Transaksi",
+                headerTitle:"Input Transaksi",
+                tabBarIcon:({color})=>(
+                    <Ionicons
+                        name="swap-horizontal"
+                        size={25}
+                        color={color}
+                    />
+                )
+            }}
         />
 
-        {/* Tab 3: Riwayat */}
+        {/* Tab 3: Camera */}
         <Tabs.Screen
-          name="riwayat"
-          listeners={{
-            tabPress: (e) => {
-              e.preventDefault();
-              router.replace({
-                pathname: '/riwayat',
-                params: { defaultTipe: '', hideOther: '' }
-              });
-            },
-          }}
-          options={{
-            title: 'Riwayat',
-            tabBarIcon: ({ color }) => <FontAwesome name="history" size={22} color={color} />,
-            headerTitle: 'Riwayat Transaksi Siswa',
-          }}
+            name="camera"
+            options={{
+                title:"",
+                tabBarIcon:({focused})=>(
+                    <View
+                        style={{
+                            width:60,
+                            height:60,
+                            borderRadius:30,
+                            backgroundColor:"#2563eb",
+
+                            justifyContent:"center",
+                            alignItems:"center",
+
+                            marginTop:-25,
+
+                            shadowColor:"#2563eb",
+                            shadowOpacity:0.35,
+                            shadowRadius:10,
+                            elevation:10,
+                        }}
+                    >
+                        <Ionicons
+                            name="camera"
+                            size={28}
+                            color="#FFF"
+                        />
+                    </View>
+                )
+            }}
+        />
+
+        {/* Tab 4: Riwayat */}
+        <Tabs.Screen
+            name="riwayat"
+            options={{
+                title:"Riwayat",
+                headerTitle:"Riwayat Transaksi",
+                tabBarIcon:({color})=>(
+                    <Ionicons
+                        name="receipt-outline"
+                        size={23}
+                        color={color}
+                    />
+                )
+            }}
+        />
+
+        {/* Tab 5: Akun */}
+        <Tabs.Screen
+            name="akun"
+            options={{
+                title:"Akun",
+                tabBarIcon:({color})=>(
+                    <Ionicons
+                        name="person-circle"
+                        size={26}
+                        color={color}
+                    />
+                )
+            }}
         />
       </Tabs>
     </View>

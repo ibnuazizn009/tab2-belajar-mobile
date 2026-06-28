@@ -43,6 +43,7 @@ Route::middleware(['jwt.cookie'])->group(function () use ($prefix) {
     Route::get("$prefix/siswa/kelas", [SiswaController::class, 'getDataKelas']);
     Route::get("$prefix/siswa/siswa-per-kelas", [SiswaController::class, 'getDataSiswaPerKelas']);
     Route::get("$prefix/siswa/transaksi-per-kelas", [SiswaController::class, 'getDataTransaksiSiswaPerKelas']);
+    Route::get("$prefix/siswa/transaksi-aktivitas-kelas", [SiswaController::class, 'getRiwayatAktivitasTransaksi']);
     Route::get("$prefix/siswa/transaksi-tanggal", [SiswaController::class, 'getDataTransaksiTanggal']);
     Route::post("$prefix/siswa/tambah-siswa",  [SiswaController::class, 'postTambahSiswa']);
     Route::get("$prefix/siswa/laporan-transaksi-siswa",  [SiswaController::class, 'getLaporanTransaksiSiswa']);
